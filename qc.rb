@@ -54,9 +54,11 @@ end
 forward_files.each do |fname|
   Ryan.check_file fname, :forward
 
-  Ryan.run_it "#{zip} #{fname}"
+  `#{zip} #{fname}`
 
-  unless $?.exitstatus.zero?
+  # TODO pigz returns 2 if the file is already gzipped on linux, but 0
+  # on my mac
+  if $?.exitstatus == 1
     abort "[ERROR] Something went wrong"
   end
 end
@@ -64,9 +66,11 @@ end
 reverse_files.each do |fname|
   Ryan.check_file fname, :reverse
 
-  Ryan.run_it "#{zip} #{fname}"
+  `#{zip} #{fname}`
 
-  unless $?.exitstatus.zero?
+  # TODO pigz returns 2 if the file is already gzipped on linux, but 0
+  # on my mac
+  if $?.exitstatus == 1
     abort "[ERROR] Something went wrong"
   end
 end

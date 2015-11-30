@@ -1,1 +1,3 @@
 test_files/*/qc
+bin/flash
+vendor/lib/*/*.o
