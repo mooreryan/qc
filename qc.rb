@@ -40,7 +40,6 @@ TRIMMO = File.join File.dirname(__FILE__),
 
 FLASH = File.join File.dirname(__FILE__),
                   "bin",
-                  "osx",
                   "flash"
 
 zip = `which pigz`.chomp
