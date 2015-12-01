@@ -209,6 +209,12 @@ file_pairs.each_with_index do |(forw, rev), idx|
   cmd = "mv #{File.join(dir, "*.adapters_removed.flashed.*")} #{intermediate_d}"
   Ryan.run_it cmd
 
+  # remove fq intermediate files
+  remove_these = File.join intermediate_d, "*.{fq,fastq}"
+  cmd = "rm #{remove_these}"
+  Ryan.run_it cmd
+
   # zip everything
   cmd = "#{zip} --recursive #{qc_d}"
+  Ryan.run_it cmd
 end
