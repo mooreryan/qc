@@ -164,7 +164,7 @@ file_pairs.each_with_index do |(forw, rev), idx|
   Ryan.run_it cmd
 
   # clean up flashed stuff
-  output = File.join File.dirname(__FILE__), "flashed.*"
+  output = File.join Dir.pwd, "flashed.*"
   cmd = "mv #{output} #{dir}"
   Ryan.run_it cmd
 
