@@ -210,11 +210,10 @@ file_pairs.each_with_index do |(forw, rev), idx|
   Ryan.run_it cmd
 
   # remove fq intermediate files
-  remove_these = File.join intermediate_d, "*.{fq,fastq}"
-  cmd = "rm #{remove_these}"
-  Ryan.run_it cmd
+  # remove_these = File.join intermediate_d, "*.{fq,fastq}"
+  # cmd = "rm #{remove_these}"
+  # Ryan.run_it cmd
 
   # zip everything
-  cmd = "#{zip} --recursive #{qc_d}"
-  Ryan.run_it cmd
-end
+  # cmd = "#{zip} --recursive #{qc_d}/*"
+  # Ryan.run_it cm
