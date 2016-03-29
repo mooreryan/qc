@@ -33,12 +33,9 @@ opts = Trollop.options do
   opt(:outdir, "Output directory", type: :string, default: ".")
 end
 
-forward_files = opts[:forward].split(",")
-reverse_files = opts[:reverse].split(",")
-
-unless forward_files.count == reverse_files.count
-  abort "ERROR: Different number of fnames in --forward and --reverse"
-end
+Ryan.check_file opts[:forward], :forward
+Ryan.check_file opts[:reverse], :reverse
+Ryan.try_mkdir(opts[:outdir])
 
 TRIMMO = File.join File.dirname(__FILE__),
                    "bin",
@@ -57,32 +54,6 @@ unless $?.exitstatus.zero?
     abort "[ERROR] Need gzip or pigz"
   end
 end
-
-forward_files.each do |fname|
-  Ryan.check_file fname, :forward
-
-  `#{zip} #{fname}`
-
-  # TODO pigz returns 2 if the file is already gzipped on linux, but 0
-  # on my mac
-  if $?.exitstatus == 1
-    abort "[ERROR] Something went wrong"
-  end
-end
-
-reverse_files.each do |fname|
-  Ryan.check_file fname, :reverse
-
-  `#{zip} #{fname}`
-
-  # TODO pigz returns 2 if the file is already gzipped on linux, but 0
-  # on my mac
-  if $?.exitstatus == 1
-    abort "[ERROR] Something went wrong"
-  end
-end
-
-Ryan.try_mkdir(opts[:outdir])
 
 def get_baseout fname
   "#{fname.split(".").first}.adapters_removed.fq"
