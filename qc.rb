@@ -180,13 +180,16 @@ TRIMSEQS = File.join File.dirname(__FILE__),
                      "adapters",
                      "TruSeq3-PE-both.fa"
 
-big_log = File.join opts[:outdir], "log.big.txt"
+now = Time.now.strftime "%Y%m%d%H%M%S%L"
+big_log = File.join opts[:outdir], "qc_log.#{now}.txt"
 baseout = File.join opts[:outdir], "reads"
 
 forward = Ryan.check_file(opts[:forward], :forward)
 reverse = Ryan.check_file(opts[:reverse], :reverse)
 
-Ryan.run_it "rm -r #{opts[:outdir]}"
+abort_if File.exists?(opts[:outdir]),
+         "Outdir #{opts[:outdir]} already exists!"
+
 Ryan.try_mkdir(opts[:outdir])
 
 baseout += ".adpater_trimmed"
