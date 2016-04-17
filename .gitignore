@@ -1,3 +1,4 @@
-test_files/*/qc
 bin/flash
-vendor/lib/*/*.o
+vendor/lib/FLASH-1.2.11/*.o
+vendor/lib/FLASH-1.2.11/flash
+test_files/test3/output/
