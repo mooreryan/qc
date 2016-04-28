@@ -1,7 +1,5 @@
 #!/usr/bin/env ruby
 
-#!/usr/bin/env ruby
-
 # Copyright 2015 - 2016 Ryan Moore
 # Contact: moorer@udel.edu
 #
@@ -19,10 +17,49 @@
 # along with this program.  If not, see
 # <http://www.gnu.org/licenses/>.
 
+require "parse_fasta"
 require "abort_if"
+require "systemu"
+require "fileutils"
+require "trollop"
 
 include AbortIf
 include AbortIf::Assert
+
+module CoreExtensions
+  module Process
+    def run_it *a, &b
+      logger.debug { "Running: #{a.join(" and ")}" }
+
+      exit_status, stdout, stderr = systemu *a, &b
+
+      puts stdout unless stdout.empty?
+      $stderr.puts stderr unless stderr.empty?
+
+      exit_status.exitstatus
+    end
+
+    def run_it! *a, &b
+      exit_status = self.run_it *a, &b
+
+      abort_unless exit_status.zero?,
+                   "ERROR: non-zero exit status (#{exit_status})"
+
+      exit_status
+    end
+  end
+end
+Process.extend CoreExtensions::Process
+
+def cat_fastq_files outf, *fnames
+  File.open(outf, "w") do |f|
+    fnames.each do |fname|
+      FastqFile.open(fname).each_record_fast do |head, seq, desc, qual|
+        f.puts "@#{head}\n#{seq}\n+#{desc}\n#{qual}"
+      end
+    end
+  end
+end
 
 def check_files *fnames
   fnames.each do |fname|
@@ -55,48 +92,48 @@ def qual_trim_se!(inf:, out:, log:)
           "MINLEN:#{MIN_LEN} " +
           ">> #{log} 2>&1"
 
-    Ryan.run_it! cmd
+    Process.run_it! cmd
   else
     warn "WARN: no reads in #{inf}"
   end
 
-  Ryan.run_it! "rm #{inf}"
+  Process.run_it! "rm #{inf}"
 
   out
 end
 
 def qual_trim_pe! in1:, in2:, baseout:, log:
-  cmd = "java -jar #{TRIMMO} PE " +
-        "-threads #{THREADS} " +
-        "#{in1} " +
-        "#{in2} " +
-        "-baseout #{baseout} " +
-        "SLIDINGWINDOW:#{WINDOW_SIZE}:#{QUAL} " +
-        "MINLEN:#{MIN_LEN} " +
-        ">> #{log} 2>&1"
+                     cmd = "java -jar #{TRIMMO} PE " +
+                           "-threads #{THREADS} " +
+                           "#{in1} " +
+                           "#{in2} " +
+                           "-baseout #{baseout} " +
+                           "SLIDINGWINDOW:#{WINDOW_SIZE}:#{QUAL} " +
+                           "MINLEN:#{MIN_LEN} " +
+                           ">> #{log} 2>&1"
 
-  Ryan.run_it! cmd
-  Ryan.run_it! "rm #{in1} #{in2}"
+  Process.run_it! cmd
+  Process.run_it! "rm #{in1} #{in2}"
 end
 
 def flash! in1:, in2:, outdir:, log:
-  cmd = "#{FLASH} " +
-        "--threads #{THREADS} " +
-        "--output-prefix flashed " +
-        "--max-overlap #{MAX_OVERLAP} " +
-        "#{in1} " +
-        "#{in2} " +
-        "--output-directory #{outdir} " +
-        ">> #{log} 2>&1"
+              cmd = "#{FLASH} " +
+                    "--threads #{THREADS} " +
+                    "--output-prefix flashed " +
+                    "--max-overlap #{MAX_OVERLAP} " +
+                    "#{in1} " +
+                    "#{in2} " +
+                    "--output-directory #{outdir} " +
+                    ">> #{log} 2>&1"
 
-  Ryan.run_it! cmd
-  Ryan.run_it! "rm #{in1} #{in2}"
-  Ryan.run_it!("mv #{outdir}/flashed.extendedFrags.fastq " +
-               "#{outdir}/../reads.adapter_trimmed.flash_combined")
-  Ryan.run_it!("mv #{outdir}/flashed.notCombined_1.fastq " +
-               "#{outdir}/../reads.adapter_trimmed.flash_notcombined_1P")
-  Ryan.run_it!("mv #{outdir}/flashed.notCombined_2.fastq " +
-               "#{outdir}/../reads.adapter_trimmed.flash_notcombined_2P")
+  Process.run_it! cmd
+  Process.run_it! "rm #{in1} #{in2}"
+  Process.run_it!("mv #{outdir}/flashed.extendedFrags.fastq " +
+                  "#{outdir}/../reads.adapter_trimmed.flash_combined")
+  Process.run_it!("mv #{outdir}/flashed.notCombined_1.fastq " +
+                  "#{outdir}/../reads.adapter_trimmed.flash_notcombined_1P")
+  Process.run_it!("mv #{outdir}/flashed.notCombined_2.fastq " +
+                  "#{outdir}/../reads.adapter_trimmed.flash_notcombined_2P")
 end
 
 def adapter_trim!(in1:, in2:, baseout:, log:)
@@ -113,16 +150,11 @@ def adapter_trim!(in1:, in2:, baseout:, log:)
         "#{SIMPLE_CLIP_THRESHOLD} " +
         ">> #{log} 2>&1"
 
-  Ryan.run_it! cmd
+  Process.run_it! cmd
 end
 
 
 Signal.trap("PIPE", "EXIT")
-
-methods = File.join(File.expand_path("~"), "lib", "ruby", "ryan.rb")
-require_relative methods
-
-Ryan.req *%w[parse_fasta]
 
 VERSION = "
     Version: 0.1.0
@@ -144,8 +176,8 @@ opts = Trollop.options do
   Options:
   EOS
 
-  opt(:forward, "forward", type: :string)
-  opt(:reverse, "reverse", type: :string)
+  opt(:forward, "forward", type: :strings)
+  opt(:reverse, "reverse", type: :strings)
 
   opt(:threads, "Threads", type: :integer, default: 10)
 
@@ -184,18 +216,24 @@ now = Time.now.strftime "%Y%m%d%H%M%S%L"
 big_log = File.join opts[:outdir], "qc_log.#{now}.txt"
 baseout = File.join opts[:outdir], "reads"
 
-forward = Ryan.check_file(opts[:forward], :forward)
-reverse = Ryan.check_file(opts[:reverse], :reverse)
+check_files *opts[:forward]
+check_files *opts[:reverse]
+
+in_forward = File.join opts[:outdir], "tmp.1.fq"
+in_reverse = File.join opts[:outdir], "tmp.2.fq"
 
 abort_if File.exists?(opts[:outdir]),
          "Outdir #{opts[:outdir]} already exists!"
 
-Ryan.try_mkdir(opts[:outdir])
+FileUtils.mkdir_p opts[:outdir]
+
+cat_fastq_files in_forward, *opts[:forward]
+cat_fastq_files in_reverse, *opts[:reverse]
 
 baseout += ".adpater_trimmed"
 
-adapter_trim!(in1: opts[:forward],
-              in2: opts[:reverse],
+adapter_trim!(in1: in_forward,
+              in2: in_reverse,
               baseout: baseout,
               log: big_log)
 
@@ -258,30 +296,33 @@ out_paired_1 = File.join opts[:outdir], "reads.1.fq"
 out_paired_2 = File.join opts[:outdir], "reads.2.fq"
 out_unpaired = File.join opts[:outdir], "reads.unpaired.fq"
 
-Ryan.run_it! "mv #{out_flash_1P} #{out_paired_1}"
-Ryan.run_it! "mv #{out_flash_2P} #{out_paired_2}"
+Process.run_it! "mv #{out_flash_1P} #{out_paired_1}"
+Process.run_it! "mv #{out_flash_2P} #{out_paired_2}"
 
-Ryan.run_it! "cat " +
-             "#{out_flash_single} " +
-             "#{out_flash_1U} " +
-             "#{out_flash_2U} " +
-             "#{out_1U} " +
-             "#{out_2U} " +
-             "> #{out_unpaired}"
+Process.run_it! "cat " +
+                "#{out_flash_single} " +
+                "#{out_flash_1U} " +
+                "#{out_flash_2U} " +
+                "#{out_1U} " +
+                "#{out_2U} " +
+                "> #{out_unpaired}"
 
-Ryan.run_it! "rm " +
-             "#{out_flash_single} " +
-             "#{out_flash_1U} " +
-             "#{out_flash_2U} " +
-             "#{out_1U} " +
-             "#{out_2U}"
+Process.run_it! "rm " +
+                "#{in_forward} " +
+                "#{in_reverse} " +
+                "#{out_flash_single} " +
+                "#{out_flash_1U} " +
+                "#{out_flash_2U} " +
+                "#{out_1U} " +
+                "#{out_2U}"
+
 
 gzip = `which pigz`.chomp
 gzip = `which gzip`.chomp if gzip.empty?
 
 unless gzip.empty?
-  Ryan.run_it! "#{gzip} --best --processes #{THREADS} " +
-               "#{out_unpaired} " +
-               "#{out_paired_1} " +
-               "#{out_paired_2}"
+  Process.run_it! "#{gzip} --best --processes #{THREADS} " +
+                  "#{out_unpaired} " +
+                  "#{out_paired_1} " +
+                  "#{out_paired_2}"
 end
