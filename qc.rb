@@ -212,6 +212,9 @@ TRIMSEQS = File.join File.dirname(__FILE__),
                      "adapters",
                      "TruSeq3-PE-both.fa"
 
+java = `which java`.chomp
+abort_if java.empty?, "Missing java"
+
 now = Time.now.strftime "%Y%m%d%H%M%S%L"
 big_log = File.join opts[:outdir], "qc_log.#{now}.txt"
 baseout = File.join opts[:outdir], "reads"
