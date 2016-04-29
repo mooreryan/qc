@@ -248,3 +248,6 @@ else
                  "#{out_paired_interleaved_fa}"
 
 end
+
+AbortIf.logger.info { "QC finished" }
+AbortIf.logger.info { "Output directory: #{opts[:outdir]}" }

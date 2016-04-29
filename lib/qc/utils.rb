@@ -3,6 +3,8 @@ module QC
     def cat_fastq_files outf, *fnames
       File.open(outf, "w") do |f|
         fnames.each do |fname|
+          AbortIf.logger.debug { "Writing #{fname} to #{outf}" }
+
           FastqFile.open(fname).each_record_fast do |head, seq, desc, qual|
             f.puts "@#{head}\n#{seq}\n+#{desc}\n#{qual}"
           end
