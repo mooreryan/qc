@@ -35,7 +35,7 @@ Process.extend CoreExt::Process
 Signal.trap("PIPE", "EXIT")
 
 VERSION = "
-    Version: 0.2.0
+    Version: 0.2.1
   Copyright: 2015 - 2016 Ryan Moore
     Contact: moorer@udel.edu
     Website: https://github.com/mooreryan/qc
