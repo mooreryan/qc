@@ -240,7 +240,7 @@ if pigz.empty?
                     "#{out_paired_interleaved_fa}"
   end
 else
-  Process.run_it "#{gzip} --best --processes #{THREADS} " +
+  Process.run_it "#{pigz} --best --processes #{THREADS} " +
                  "#{out_unpaired} " +
                  "#{out_unpaired_fa} " +
                  "#{out_paired_1} " +
