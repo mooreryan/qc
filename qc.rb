@@ -23,141 +23,19 @@ require "systemu"
 require "fileutils"
 require "trollop"
 
+require_relative "lib/core_ext/process"
+require_relative "lib/qc/utils"
+
 include AbortIf
 include AbortIf::Assert
+include QC::Utils
 
-module CoreExtensions
-  module Process
-    def run_it *a, &b
-      logger.debug { "Running: #{a.join(" and ")}" }
-
-      exit_status, stdout, stderr = systemu *a, &b
-
-      puts stdout unless stdout.empty?
-      $stderr.puts stderr unless stderr.empty?
-
-      exit_status.exitstatus
-    end
-
-    def run_it! *a, &b
-      exit_status = self.run_it *a, &b
-
-      abort_unless exit_status.zero?,
-                   "ERROR: non-zero exit status (#{exit_status})"
-
-      exit_status
-    end
-  end
-end
-Process.extend CoreExtensions::Process
-
-def cat_fastq_files outf, *fnames
-  File.open(outf, "w") do |f|
-    fnames.each do |fname|
-      FastqFile.open(fname).each_record_fast do |head, seq, desc, qual|
-        f.puts "@#{head}\n#{seq}\n+#{desc}\n#{qual}"
-      end
-    end
-  end
-end
-
-def check_files *fnames
-  fnames.each do |fname|
-    abort_unless_file_exists fname
-  end
-end
-
-def eputs msg=""
-  $stderr.puts msg
-end
-
-def seqcount fname
-  if fname.match(/.gz$/)
-    num_seqs = (`gunzip -c #{fname} | wc -l`.to_f / 4).round
-  else
-    num_seqs = (`wc -l #{fname}`.to_f / 4).round
-  end
-
-  num_seqs
-end
-
-def qual_trim_se!(inf:, out:, log:)
-  count = seqcount inf
-  if count >= 1
-    cmd = "java -jar #{TRIMMO} SE " +
-          "-threads #{THREADS} " +
-          "#{inf} " +
-          "#{out} " +
-          "SLIDINGWINDOW:#{WINDOW_SIZE}:#{QUAL} " +
-          "MINLEN:#{MIN_LEN} " +
-          ">> #{log} 2>&1"
-
-    Process.run_it! cmd
-  else
-    warn "WARN: no reads in #{inf}"
-  end
-
-  Process.run_it! "rm #{inf}"
-
-  out
-end
-
-def qual_trim_pe! in1:, in2:, baseout:, log:
-                     cmd = "java -jar #{TRIMMO} PE " +
-                           "-threads #{THREADS} " +
-                           "#{in1} " +
-                           "#{in2} " +
-                           "-baseout #{baseout} " +
-                           "SLIDINGWINDOW:#{WINDOW_SIZE}:#{QUAL} " +
-                           "MINLEN:#{MIN_LEN} " +
-                           ">> #{log} 2>&1"
-
-  Process.run_it! cmd
-  Process.run_it! "rm #{in1} #{in2}"
-end
-
-def flash! in1:, in2:, outdir:, log:
-              cmd = "#{FLASH} " +
-                    "--threads #{THREADS} " +
-                    "--output-prefix flashed " +
-                    "--max-overlap #{MAX_OVERLAP} " +
-                    "#{in1} " +
-                    "#{in2} " +
-                    "--output-directory #{outdir} " +
-                    ">> #{log} 2>&1"
-
-  Process.run_it! cmd
-  Process.run_it! "rm #{in1} #{in2}"
-  Process.run_it!("mv #{outdir}/flashed.extendedFrags.fastq " +
-                  "#{outdir}/../reads.adapter_trimmed.flash_combined")
-  Process.run_it!("mv #{outdir}/flashed.notCombined_1.fastq " +
-                  "#{outdir}/../reads.adapter_trimmed.flash_notcombined_1P")
-  Process.run_it!("mv #{outdir}/flashed.notCombined_2.fastq " +
-                  "#{outdir}/../reads.adapter_trimmed.flash_notcombined_2P")
-end
-
-def adapter_trim!(in1:, in2:, baseout:, log:)
-  # Trim the adapters
-  cmd = "java -jar #{TRIMMO} PE " +
-        "-threads #{THREADS} " +
-        "-baseout #{baseout} " +
-        "#{in1} " +
-        "#{in2} " +
-        "ILLUMINACLIP:" +
-        "#{TRIMSEQS}:" +
-        "#{SEED_MISMATCHES}:" +
-        "#{PALINDROME_CLIP_THRESHOLD}:" +
-        "#{SIMPLE_CLIP_THRESHOLD} " +
-        ">> #{log} 2>&1"
-
-  Process.run_it! cmd
-end
-
+Process.extend CoreExt::Process
 
 Signal.trap("PIPE", "EXIT")
 
 VERSION = "
-    Version: 0.1.0
+    Version: 0.2.0
   Copyright: 2015 - 2016 Ryan Moore
     Contact: moorer@udel.edu
     Website: https://github.com/mooreryan/qc
@@ -182,7 +60,7 @@ opts = Trollop.options do
   opt(:threads, "Threads", type: :integer, default: 10)
 
   opt(:outdir, "Output directory", type: :string,
-      default: "one_lib_with_flash")
+      default: "qc")
 end
 
 TRIMMO = File.join File.dirname(__FILE__),
@@ -299,6 +177,14 @@ out_paired_1 = File.join opts[:outdir], "reads.1.fq"
 out_paired_2 = File.join opts[:outdir], "reads.2.fq"
 out_unpaired = File.join opts[:outdir], "reads.unpaired.fq"
 
+outfasta_d = File.join opts[:outdir], "for_idba"
+FileUtils.mkdir_p outfasta_d
+
+out_paired_interleaved_fa = File.join outfasta_d,
+                                      "reads.1_and_2_interleaved.fa"
+out_unpaired_fa = File.join outfasta_d,
+                            "reads.unpaired.fa"
+
 Process.run_it! "mv #{out_flash_1P} #{out_paired_1}"
 Process.run_it! "mv #{out_flash_2P} #{out_paired_2}"
 
@@ -320,12 +206,45 @@ Process.run_it! "rm " +
                 "#{out_2U}"
 
 
-gzip = `which pigz`.chomp
-gzip = `which gzip`.chomp if gzip.empty?
-
-unless gzip.empty?
-  Process.run_it! "#{gzip} --best --processes #{THREADS} " +
-                  "#{out_unpaired} " +
+fq2fa = `which fq2fa`.chomp
+if fq2fa.empty?
+  AbortIf.logger.warn { "Cannot locate fq2fa program. No IDBA " +
+                        "files will be made" }
+else
+  Process.run_it! "#{fq2fa} " +
+                  "--filter " +
+                  "--merge " +
                   "#{out_paired_1} " +
-                  "#{out_paired_2}"
+                  "#{out_paired_2} " +
+                  "#{out_paired_interleaved_fa}"
+
+  Process.run_it! "#{fq2fa} " +
+                  "--filter " +
+                  "#{out_unpaired} " +
+                  "#{out_unpaired_fa}"
+end
+
+pigz = `which pigz`.chomp
+if pigz.empty?
+  gzip = `which gzip`.chomp
+
+  if gzip.empty?
+    AbortIf.logger.warn { "Cannot locate pigz or gzip. Output " +
+                          "files will not be zipped." }
+  else
+    Process.run_it "#{gzip} " +
+                    "#{out_unpaired} " +
+                    "#{out_unpaired_fa} " +
+                    "#{out_paired_1} " +
+                    "#{out_paired_2} " +
+                    "#{out_paired_interleaved_fa}"
+  end
+else
+  Process.run_it "#{gzip} --best --processes #{THREADS} " +
+                 "#{out_unpaired} " +
+                 "#{out_unpaired_fa} " +
+                 "#{out_paired_1} " +
+                 "#{out_paired_2} " +
+                 "#{out_paired_interleaved_fa}"
+
 end
