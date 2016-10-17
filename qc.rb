@@ -23,6 +23,56 @@ require "systemu"
 require "fileutils"
 require "trollop"
 
+# Monkey patch to handle the odd gzipped Illumina files from the
+# 2016_09 MMGs
+class FastqFile < File
+  def each_record_fast
+    count = 0
+    header = ''
+    sequence = ''
+    description = ''
+    quality = ''
+
+    begin
+      begin
+        f = Zlib::GzipReader.open(self)
+        f = IO.popen("gzip -cd #{self.path}")
+        AbortIf.logger.debug { "f is #{f.class}, #{f.inspect}" }
+      rescue Zlib::GzipFile::Error => e
+        f = self
+      end
+
+      num = 0
+      f.each_line do |line|
+        # debug line[0..10]
+        num += 1
+        line.chomp!
+
+        case count
+        when 0
+          header = line[1..-1]
+        when 1
+          sequence = line
+        when 2
+          description = line[1..-1]
+        when 3
+          count = -1
+          quality = line
+          yield(header, sequence, description, quality)
+        end
+
+        count += 1
+      end
+
+      f.close if f.instance_of?(Zlib::GzipReader)
+      STDERR.puts "DEBUG -- Total lines from pf is #{num}"
+      return f
+    ensure
+      f.close if f
+    end
+  end
+end
+
 require_relative "lib/core_ext/process"
 require_relative "lib/qc/utils"
 
@@ -35,8 +85,8 @@ Process.extend CoreExt::Process
 Signal.trap("PIPE", "EXIT")
 
 VERSION = "
-    Version: 0.2.1
-  Copyright: 2015 - 2016 Ryan Moore
+    Version: 0.2.2
+    Copyright: 2015 - 2016 Ryan Moore
     Contact: moorer@udel.edu
     Website: https://github.com/mooreryan/qc
     License: GPLv3
