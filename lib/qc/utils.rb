@@ -103,5 +103,39 @@ module QC
 
       Process.run_it! cmd
     end
+
+    def screen!(reads:, log:)
+      # use bowtie2 to screen reads against against a genome
+      good_reads = reads + ".did_not_align_to_bos_taurus.fq"
+      bad_reads  = reads + ".did_align_to_bos_taurus.fq"
+
+      cmd = "#{BOWTIE} -x #{BOWTIE_IDX} " +
+            "-U #{reads} " +
+            "--sensitive --end-to-end " +
+            "--threads #{THREADS} " +
+            "--un #{good_reads} " +
+            "--al #{bad_reads} " +
+            "-S /dev/null " +
+            ">> #{log} 2>&1"
+
+      Process.run_it! cmd
+
+      [good_reads, bad_reads]
+    end
+
+    def fix_pairs!(in1:, in2:, outdir:, log:)
+      basename = File.join outdir, "ryanapplehehe"
+
+      cmd = "#{FIX_PAIRS} #{in1} #{in2} #{basename} " +
+            ">> #{log} 2>&1"
+
+      Process.run_it! cmd
+
+      out1 = basename + ".1.fq"
+      out2 = basename + ".2.fq"
+      outU = basename + ".U.fq"
+
+      [out1, out2, outU]
+    end
   end
 end

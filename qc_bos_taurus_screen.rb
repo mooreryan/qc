@@ -116,6 +116,11 @@ opts = Trollop.options do
 
   opt(:outdir, "Output directory", type: :string,
       default: "qc_with_bos_taurus_screen")
+
+  opt(:bowtie_idx, "The bowtie2 index to screen reads against",
+      type: :string,
+      default: "/home/moorer/repository/genomes/bos_taurus/" +
+      "2016_06_11/GCF_000003055.6_Bos_taurus_UMD_3.1.1_genomic.fna")
 end
 
 TRIMMO = File.join File.dirname(__FILE__),
@@ -151,6 +156,11 @@ abort_if java.empty?, "Missing java"
 BOWTIE = `which bowtie2`.chomp
 abort_if BOWTIE.empty?, "Missing bowtie2"
 
+BOWTIE_IDX = opts[:bowtie_idx]
+
+FIX_PAIRS = `which FixPairs`.chomp
+abort_if FIX_PAIRS.empty?, "Missing FixPairs"
+
 now = Time.now.strftime "%Y%m%d%H%M%S%L"
 big_log = File.join opts[:outdir], "qc_log.#{now}.txt"
 baseout = File.join opts[:outdir], "reads"
@@ -166,8 +176,14 @@ abort_if File.exists?(opts[:outdir]),
 
 FileUtils.mkdir_p opts[:outdir]
 
+reads_that_hit_genome_dir = File.join opts[:outdir],
+                                      "those_that_hit_the_genome"
+FileUtils.mkdir_p reads_that_hit_genome_dir
+
+
 baseout += ".adpater_trimmed"
 
+# TRIM ADAPTERS
 adapter_trim!(in1: in_forward,
               in2: in_reverse,
               baseout: baseout,
@@ -181,14 +197,17 @@ out_2U = baseout + "_2U"
 check_files out_1P, out_1U, out_2P, out_2U
 
 out = out_1U + ".qual_trimmed"
+# QUALITY TRIM
 out_1U = qual_trim_se!(inf: out_1U, out: out, log: big_log)
 check_files out_1U
 
 out = out_2U + ".qual_trimmed"
+# QUALITY TRIM
 out_2U = qual_trim_se!(inf: out_2U, out: out, log: big_log)
 check_files out_2U
 
 flash_dir = File.join opts[:outdir], "flash"
+# FLASH READS
 flash!(in1: out_1P, in2: out_2P, outdir: flash_dir, log: big_log)
 
 out_flash_single = File.join opts[:outdir],
@@ -202,6 +221,7 @@ out_flash_2P = File.join opts[:outdir],
 check_files out_flash_single, out_flash_1P, out_flash_2P
 
 out = out_flash_single + ".qual_trimmed"
+# QUAL TRIM
 out_flash_single = qual_trim_se!(inf: out_flash_single,
                                  out: out,
                                  log: big_log)
@@ -209,6 +229,7 @@ out_flash_single = qual_trim_se!(inf: out_flash_single,
 check_files out_flash_single
 
 baseout = out_flash_1P.sub(/_1P$/, "") + ".qual_trimmed"
+# QUAL TRIM
 qual_trim_pe!(in1: out_flash_1P,
               in2: out_flash_2P,
               baseout: baseout,
@@ -230,7 +251,7 @@ check_files out_flash_1P,
 
 out_paired_1 = File.join opts[:outdir], "reads.1.fq"
 out_paired_2 = File.join opts[:outdir], "reads.2.fq"
-out_unpaired = File.join opts[:outdir], "reads.unpaired.fq"
+out_unpaired = File.join opts[:outdir], "reads.U.fq"
 
 outfasta_d = File.join opts[:outdir], "for_idba"
 FileUtils.mkdir_p outfasta_d
@@ -238,7 +259,7 @@ FileUtils.mkdir_p outfasta_d
 out_paired_interleaved_fa = File.join outfasta_d,
                                       "reads.1_and_2_interleaved.fa"
 out_unpaired_fa = File.join outfasta_d,
-                            "reads.unpaired.fa"
+                            "reads.U.fa"
 
 Process.run_it! "mv #{out_flash_1P} #{out_paired_1}"
 Process.run_it! "mv #{out_flash_2P} #{out_paired_2}"
@@ -257,6 +278,63 @@ Process.run_it! "rm " +
                 "#{out_flash_2U} " +
                 "#{out_1U} " +
                 "#{out_2U}"
+
+
+# Now the files are
+#   out_paired_1
+#   out_paired_2
+#   out_unpaired
+
+# They now will be screened against bos taurus genome
+out_paired_1_good_reads, out_paired_1_bad_reads =
+                         screen!(reads: out_paired_1, log: big_log)
+
+out_paired_2_good_reads, out_paired_2_bad_reads =
+                         screen!(reads: out_paired_2, log: big_log)
+
+out_unpaired_good_reads, out_unpaired_bad_reads =
+                         screen!(reads: out_unpaired, log: big_log)
+
+reads_that_hit_genome = File.join reads_that_hit_genome_dir,
+                                  "reads_that_hit_genome.U.fq"
+
+# combine all the reads that did align
+Process.run_it! "cat " +
+                [out_paired_1_bad_reads,
+                 out_paired_2_bad_reads,
+                 out_unpaired_bad_reads].join(" ") +
+                " > #{reads_that_hit_genome}"
+
+# Delete the files that were just catted into the new file
+Process.run_it! "rm " +
+                [out_paired_1_bad_reads,
+                 out_paired_2_bad_reads,
+                 out_unpaired_bad_reads].join(" ")
+
+# fix the pair info for the reads that did not hit the genome
+out1, out2, outU = fix_pairs!(in1: out_paired_1_good_reads,
+                              in2: out_paired_2_good_reads,
+                              log: big_log,
+                              outdir: opts[:outdir])
+
+# remove the two files that went into fix pairs command
+Process.run_it! "rm " +
+                [out_paired_1_good_reads,
+                 out_paired_2_good_reads].join(" ")
+
+# add the unpaired reads to the others
+tmp_unpaired_reads = File.join opts[:outdir], "tmpreads12309487124"
+Process.run_it! "cat " +
+                [out_unpaired_good_reads, outU].join(" ") +
+                " > #{tmp_unpaired_reads}"
+
+# delete the files that were just catted
+Process.run_it! "rm " + [out_unpaired_good_reads, outU].join(" ")
+
+# Now clean up a bit
+Process.run_it! "mv #{tmp_unpaired_reads} #{out_unpaired}"
+Process.run_it! "mv #{out1} #{out_paired_1}"
+Process.run_it! "mv #{out2} #{out_paired_2}"
 
 
 fq2fa = `which fq2fa`.chomp
@@ -286,11 +364,12 @@ if pigz.empty?
                           "files will not be zipped." }
   else
     Process.run_it "#{gzip} " +
-                    "#{out_unpaired} " +
-                    "#{out_unpaired_fa} " +
-                    "#{out_paired_1} " +
-                    "#{out_paired_2} " +
-                    "#{out_paired_interleaved_fa}"
+                   "#{out_unpaired} " +
+                   "#{out_unpaired_fa} " +
+                   "#{out_paired_1} " +
+                   "#{out_paired_2} " +
+                   "#{out_paired_interleaved_fa} " +
+                   "#{reads_that_hit_genome}"
   end
 else
   Process.run_it "#{pigz} --best --processes #{THREADS} " +
@@ -298,7 +377,8 @@ else
                  "#{out_unpaired_fa} " +
                  "#{out_paired_1} " +
                  "#{out_paired_2} " +
-                 "#{out_paired_interleaved_fa}"
+                 "#{out_paired_interleaved_fa} " +
+                 "#{reads_that_hit_genome}"
 
 end
 
