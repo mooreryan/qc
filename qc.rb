@@ -17,6 +17,13 @@
 # along with this program.  If not, see
 # <http://www.gnu.org/licenses/>.
 
+# Changelog ##########################################################
+#
+# v0.3.0 - 2016-12-14 (RMM) - If provided only a single library, don't
+#                             cat the input files.
+#
+######################################################################
+
 require "parse_fasta"
 require "abort_if"
 require "systemu"
@@ -85,7 +92,7 @@ Process.extend CoreExt::Process
 Signal.trap("PIPE", "EXIT")
 
 VERSION = "
-    Version: 0.2.2
+    Version: 0.3.0
     Copyright: 2015 - 2016 Ryan Moore
     Contact: moorer@udel.edu
     Website: https://github.com/mooreryan/qc
@@ -150,16 +157,25 @@ baseout = File.join opts[:outdir], "reads"
 check_files *opts[:forward]
 check_files *opts[:reverse]
 
-in_forward = File.join opts[:outdir], "tmp.1.fq"
-in_reverse = File.join opts[:outdir], "tmp.2.fq"
-
 abort_if File.exists?(opts[:outdir]),
          "Outdir #{opts[:outdir]} already exists!"
-
 FileUtils.mkdir_p opts[:outdir]
 
-cat_fastq_files in_forward, *opts[:forward]
-cat_fastq_files in_reverse, *opts[:reverse]
+# only one library don't cat the files
+if opts[:forward].length == 1 && opts[:reverse].length == 1
+  AbortIf.logger.info { "Only one forward and one reverse file " +
+                        "provided. Not catting files." }
+  in_forward = opts[:forward]
+  in_reverse = opts[:reverse]
+else
+  AbortIf.logger.info { "Multiple libraries provided. Catting files" }
+
+  in_forward = File.join opts[:outdir], "tmp.1.fq"
+  in_reverse = File.join opts[:outdir], "tmp.2.fq"
+
+  cat_fastq_files in_forward, *opts[:forward]
+  cat_fastq_files in_reverse, *opts[:reverse]
+end
 
 baseout += ".adpater_trimmed"
 
