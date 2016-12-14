@@ -21,6 +21,7 @@
 #
 # v0.3.0 - 2016-12-14 (RMM) - If provided only a single library, don't
 #                             cat the input files.
+# v0.3.1 - 2016-12-14 (RMM) - Bugfix
 #
 ######################################################################
 
@@ -92,7 +93,7 @@ Process.extend CoreExt::Process
 Signal.trap("PIPE", "EXIT")
 
 VERSION = "
-    Version: 0.3.0
+    Version: 0.3.1
     Copyright: 2015 - 2016 Ryan Moore
     Contact: moorer@udel.edu
     Website: https://github.com/mooreryan/qc
@@ -165,8 +166,8 @@ FileUtils.mkdir_p opts[:outdir]
 if opts[:forward].length == 1 && opts[:reverse].length == 1
   AbortIf.logger.info { "Only one forward and one reverse file " +
                         "provided. Not catting files." }
-  in_forward = opts[:forward]
-  in_reverse = opts[:reverse]
+  in_forward = opts[:forward].first
+  in_reverse = opts[:reverse].first
 else
   AbortIf.logger.info { "Multiple libraries provided. Catting files" }
 
