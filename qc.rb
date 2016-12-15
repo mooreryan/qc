@@ -21,7 +21,13 @@
 #
 # v0.3.0 - 2016-12-14 (RMM) - If provided only a single library, don't
 #                             cat the input files.
+#
 # v0.3.1 - 2016-12-14 (RMM) - Bugfix
+#
+# v0.3.2 - 2016-12-14 (RMM) - Don't rm #{in_forward} and #{in_reverse}
+#                             if there is only one library, cos in
+#                             this case, these are the actual input
+#                             files.
 #
 ######################################################################
 
@@ -93,7 +99,7 @@ Process.extend CoreExt::Process
 Signal.trap("PIPE", "EXIT")
 
 VERSION = "
-    Version: 0.3.1
+    Version: 0.3.2
     Copyright: 2015 - 2016 Ryan Moore
     Contact: moorer@udel.edu
     Website: https://github.com/mooreryan/qc
@@ -263,14 +269,27 @@ Process.run_it! "cat " +
                 "#{out_2U} " +
                 "> #{out_unpaired}"
 
-Process.run_it! "rm " +
-                "#{in_forward} " +
-                "#{in_reverse} " +
-                "#{out_flash_single} " +
-                "#{out_flash_1U} " +
-                "#{out_flash_2U} " +
-                "#{out_1U} " +
-                "#{out_2U}"
+# only one library delete infiles
+if opts[:forward].length == 1 && opts[:reverse].length == 1
+  AbortIf.logger.info { "Only one forward and one reverse file " +
+                        "provided. Not gonna delete them!" }
+
+  Process.run_it! "rm " +
+                  "#{out_flash_single} " +
+                  "#{out_flash_1U} " +
+                  "#{out_flash_2U} " +
+                  "#{out_1U} " +
+                  "#{out_2U}"
+else
+  Process.run_it! "rm " +
+                  "#{in_forward} " +
+                  "#{in_reverse} " +
+                  "#{out_flash_single} " +
+                  "#{out_flash_1U} " +
+                  "#{out_flash_2U} " +
+                  "#{out_1U} " +
+                  "#{out_2U}"
+end
 
 
 fq2fa = `which fq2fa`.chomp
