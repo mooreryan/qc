@@ -50,7 +50,8 @@ opts = Trollop.options do
   opt(:outdir, "Output directory", type: :string,
       default: "qc")
 
-  opt(:idba, "Make outfiles for IDBA", type: :boolean,
+  opt(:idba, "Make combined outfiles for IDBA",
+      type: :boolean,
       defaul: false)
 
   opt(:bowtie_idx, "The bowtie2 index to screen reads against " +
@@ -79,11 +80,11 @@ if opts[:idba] && !fq2fa.empty?
   FileUtils.mkdir_p idba_dir
 
   all_paired_1 = File.join idba_dir,
-                           "all_reads.1.fq.gz"
+                           "all_reads.1.fq"
   all_paired_2 = File.join idba_dir,
-                           "all_reads.2.fq.gz"
+                           "all_reads.2.fq"
   all_unpaired = File.join idba_dir,
-                           "all_reads.U.fq.gz"
+                           "all_reads.U.fq"
 
   all_paired_interleaved_fa = File.join idba_dir,
                                         "all_reads.1_and_2_interleaved.fa"
@@ -125,13 +126,13 @@ opts[:forward].each_with_index do |for_f, idx|
     two = File.join outd, "reads.2.fq.gz"
     unp = File.join outd, "reads.U.fq.gz"
 
-    cmd = "cat #{one} >> #{all_paired_1}"
+    cmd = "gunzip -c #{one} >> #{all_paired_1}"
     Process.run_it! cmd
 
-    cmd = "cat #{two} >> #{all_paired_2}"
+    cmd = "gunzip -c #{two} >> #{all_paired_2}"
     Process.run_it! cmd
 
-    cmd = "cat #{unp} >> #{all_unpaired}"
+    cmd = "gunzip -c #{unp} >> #{all_unpaired}"
     Process.run_it! cmd
   end
 end
