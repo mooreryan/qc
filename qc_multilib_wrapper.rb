@@ -79,11 +79,11 @@ if opts[:idba] && !fq2fa.empty?
   FileUtils.mkdir_p idba_dir
 
   all_paired_1 = File.join idba_dir,
-                           "all_reads.1.fq"
+                           "all_reads.1.fq.gz"
   all_paired_2 = File.join idba_dir,
-                           "all_reads.2.fq"
+                           "all_reads.2.fq.gz"
   all_unpaired = File.join idba_dir,
-                           "all_reads.U.fq"
+                           "all_reads.U.fq.gz"
 
   all_paired_interleaved_fa = File.join idba_dir,
                                         "all_reads.1_and_2_interleaved.fa"
@@ -101,12 +101,20 @@ opts[:forward].each_with_index do |for_f, idx|
 
   outd = File.join opts[:outdir], basename
 
-  cmd = "ruby qc.rb " +
-        "-f #{for_f} " +
-        "-r #{rev_f} " +
-        "-t #{opts[:threads]} " +
-        "-o #{outd} " +
-        "-b #{opts[:bowtie_idx].join(" ")}"
+  if opts[:bowtie_idx]
+    cmd = "ruby qc.rb " +
+          "-f #{for_f} " +
+          "-r #{rev_f} " +
+          "-t #{opts[:threads]} " +
+          "-o #{outd} " +
+          "-b #{opts[:bowtie_idx].join(" ")}"
+  else
+    cmd = "ruby qc.rb " +
+          "-f #{for_f} " +
+          "-r #{rev_f} " +
+          "-t #{opts[:threads]} " +
+          "-o #{outd}"
+  end
 
   Process.run_it! cmd
 
@@ -130,6 +138,7 @@ end
 
 if opts[:idba] && !fq2fa.empty?
   AbortIf.logger.info { "Making IDBA files" }
+  # TODO this will break cos the files are zipped
   Process.run_it! "#{fq2fa} " +
                   "--filter " +
                   "--merge " +
