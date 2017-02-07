@@ -101,9 +101,12 @@ opts[:forward].each_with_index do |for_f, idx|
 
   outd = File.join opts[:outdir], basename
 
-  cmd = "ruby qc_single_lib.rb -f #{for_f} -r #{rev_f} " +
+  cmd = "ruby qc_single_lib.rb " +
+        "-f #{for_f} " +
+        "-r #{rev_f} " +
         "-t #{opts[:threads]} " +
-        "-o #{outd}"
+        "-o #{outd} " +
+        "-b #{opts[:bowtie_idx]}"
 
   Process.run_it! cmd
 
