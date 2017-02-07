@@ -106,7 +106,7 @@ opts[:forward].each_with_index do |for_f, idx|
         "-r #{rev_f} " +
         "-t #{opts[:threads]} " +
         "-o #{outd} " +
-        "-b #{opts[:bowtie_idx]}"
+        "-b #{opts[:bowtie_idx].join(" ")}"
 
   Process.run_it! cmd
 
