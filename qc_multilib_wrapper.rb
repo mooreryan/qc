@@ -101,7 +101,7 @@ opts[:forward].each_with_index do |for_f, idx|
 
   outd = File.join opts[:outdir], basename
 
-  cmd = "ruby qc_single_lib.rb " +
+  cmd = "ruby qc.rb " +
         "-f #{for_f} " +
         "-r #{rev_f} " +
         "-t #{opts[:threads]} " +
