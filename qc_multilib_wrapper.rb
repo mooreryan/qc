@@ -92,6 +92,8 @@ if opts[:idba] && !fq2fa.empty?
                               "all_reads.U.fa"
 end
 
+qc = File.join File.dirname(__FILE__), "qc.rb"
+
 opts[:forward].each_with_index do |for_f, idx|
   rev_f = opts[:reverse][idx]
 
@@ -103,14 +105,14 @@ opts[:forward].each_with_index do |for_f, idx|
   outd = File.join opts[:outdir], basename
 
   if opts[:bowtie_idx]
-    cmd = "ruby qc.rb " +
+    cmd = "ruby #{qc} " +
           "-f #{for_f} " +
           "-r #{rev_f} " +
           "-t #{opts[:threads]} " +
           "-o #{outd} " +
           "-b #{opts[:bowtie_idx].join(" ")}"
   else
-    cmd = "ruby qc.rb " +
+    cmd = "ruby #{qc} " +
           "-f #{for_f} " +
           "-r #{rev_f} " +
           "-t #{opts[:threads]} " +
