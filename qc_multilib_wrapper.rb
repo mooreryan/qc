@@ -18,7 +18,7 @@ Process.extend CoreExt::Process
 
 
 VERSION = "
-    Version: 0.1.0
+    Version: 0.4.0
     Copyright: 2015 - 2017 Ryan Moore
     Contact: moorer@udel.edu
     Website: https://github.com/mooreryan/qc
@@ -52,6 +52,11 @@ opts = Trollop.options do
 
   opt(:idba, "Make outfiles for IDBA", type: :boolean,
       defaul: false)
+
+  opt(:bowtie_idx, "The bowtie2 index to screen reads against " +
+                   "(can provide more than one)",
+      type: :strings)
+
 end
 
 check_files *opts[:forward]
