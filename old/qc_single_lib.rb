@@ -17,75 +17,10 @@
 # along with this program.  If not, see
 # <http://www.gnu.org/licenses/>.
 
-# Changelog ##########################################################
-#
-# v0.3.0 - 2016-12-14 (RMM) - If provided only a single library, don't
-#                             cat the input files.
-#
-# v0.3.1 - 2016-12-14 (RMM) - Bugfix
-#
-# v0.3.2 - 2016-12-14 (RMM) - Don't rm #{in_forward} and #{in_reverse}
-#                             if there is only one library, cos in
-#                             this case, these are the actual input
-#                             files.
-#
-######################################################################
-
-require "parse_fasta"
 require "abort_if"
 require "systemu"
 require "fileutils"
 require "trollop"
-
-# Monkey patch to handle the odd gzipped Illumina files from the
-# 2016_09 MMGs
-class FastqFile < File
-  def each_record_fast
-    count = 0
-    header = ''
-    sequence = ''
-    description = ''
-    quality = ''
-
-    begin
-      begin
-        f = Zlib::GzipReader.open(self)
-        f = IO.popen("gzip -cd #{self.path}")
-        AbortIf.logger.debug { "f is #{f.class}, #{f.inspect}" }
-      rescue Zlib::GzipFile::Error => e
-        f = self
-      end
-
-      num = 0
-      f.each_line do |line|
-        # debug line[0..10]
-        num += 1
-        line.chomp!
-
-        case count
-        when 0
-          header = line[1..-1]
-        when 1
-          sequence = line
-        when 2
-          description = line[1..-1]
-        when 3
-          count = -1
-          quality = line
-          yield(header, sequence, description, quality)
-        end
-
-        count += 1
-      end
-
-      f.close if f.instance_of?(Zlib::GzipReader)
-      STDERR.puts "DEBUG -- Total lines from pf is #{num}"
-      return f
-    ensure
-      f.close if f
-    end
-  end
-end
 
 require_relative "lib/core_ext/process"
 require_relative "lib/qc/utils"
@@ -99,12 +34,11 @@ Process.extend CoreExt::Process
 Signal.trap("PIPE", "EXIT")
 
 VERSION = "
-    Version: 0.3.2
-    Copyright: 2015 - 2016 Ryan Moore
+    Version: 0.4.0
+    Copyright: 2015 - 2017 Ryan Moore
     Contact: moorer@udel.edu
     Website: https://github.com/mooreryan/qc
     License: GPLv3
-
 "
 
 opts = Trollop.options do
@@ -118,8 +52,8 @@ opts = Trollop.options do
   Options:
   EOS
 
-  opt(:forward, "forward", type: :strings)
-  opt(:reverse, "reverse", type: :strings)
+  opt(:forward, "forward", type: :string)
+  opt(:reverse, "reverse", type: :string)
 
   opt(:threads, "Threads", type: :integer, default: 10)
 
@@ -161,30 +95,15 @@ now = Time.now.strftime "%Y%m%d%H%M%S%L"
 big_log = File.join opts[:outdir], "qc_log.#{now}.txt"
 baseout = File.join opts[:outdir], "reads"
 
-check_files *opts[:forward]
-check_files *opts[:reverse]
+check_files opts[:forward]
+check_files opts[:reverse]
 
-p :ryan
 abort_if File.exists?(opts[:outdir]),
          "Outdir #{opts[:outdir]} already exists!"
-p :moore
 FileUtils.mkdir_p opts[:outdir]
 
-# only one library don't cat the files
-if opts[:forward].length == 1 && opts[:reverse].length == 1
-  AbortIf.logger.info { "Only one forward and one reverse file " +
-                        "provided. Not catting files." }
-  in_forward = opts[:forward].first
-  in_reverse = opts[:reverse].first
-else
-  AbortIf.logger.info { "Multiple libraries provided. Catting files" }
-
-  in_forward = File.join opts[:outdir], "tmp.1.fq"
-  in_reverse = File.join opts[:outdir], "tmp.2.fq"
-
-  cat_fastq_files in_forward, *opts[:forward]
-  cat_fastq_files in_reverse, *opts[:reverse]
-end
+in_forward = opts[:forward]
+in_reverse = opts[:reverse]
 
 baseout += ".adpater_trimmed"
 
@@ -271,28 +190,12 @@ Process.run_it! "cat " +
                 "#{out_2U} " +
                 "> #{out_unpaired}"
 
-# only one library, DONT delete infiles
-if opts[:forward].length == 1 && opts[:reverse].length == 1
-  AbortIf.logger.info { "Only one forward and one reverse file " +
-                        "provided." }
-
-  Process.run_it "rm " +
-                  "#{out_flash_single} " +
-                  "#{out_flash_1U} " +
-                  "#{out_flash_2U} " +
-                  "#{out_1U} " +
-                  "#{out_2U}"
-else
-  Process.run_it "rm " +
-                  "#{in_forward} " +
-                  "#{in_reverse} " +
-                  "#{out_flash_single} " +
-                  "#{out_flash_1U} " +
-                  "#{out_flash_2U} " +
-                  "#{out_1U} " +
-                  "#{out_2U}"
-end
-
+Process.run_it "rm " +
+               "#{out_flash_single} " +
+               "#{out_flash_1U} " +
+               "#{out_flash_2U} " +
+               "#{out_1U} " +
+               "#{out_2U}"
 
 fq2fa = `which fq2fa`.chomp
 if fq2fa.empty?

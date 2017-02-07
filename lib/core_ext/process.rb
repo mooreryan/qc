@@ -15,7 +15,8 @@ module CoreExt
       exit_status = self.run_it *a, &b
 
       abort_unless exit_status.zero?,
-                   "ERROR: non-zero exit status (#{exit_status})"
+                   "ERROR: non-zero exit status (#{exit_status}) " +
+                   "while running cmd(s) '#{a.join(" and ")}'"
 
       exit_status
     end

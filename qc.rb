@@ -17,75 +17,10 @@
 # along with this program.  If not, see
 # <http://www.gnu.org/licenses/>.
 
-# Changelog ##########################################################
-#
-# v0.3.0 - 2016-12-14 (RMM) - If provided only a single library, don't
-#                             cat the input files.
-#
-# v0.3.1 - 2016-12-14 (RMM) - Bugfix
-#
-# v0.3.2 - 2016-12-14 (RMM) - Don't rm #{in_forward} and #{in_reverse}
-#                             if there is only one library, cos in
-#                             this case, these are the actual input
-#                             files.
-#
-######################################################################
-
-require "parse_fasta"
 require "abort_if"
 require "systemu"
 require "fileutils"
 require "trollop"
-
-# Monkey patch to handle the odd gzipped Illumina files from the
-# 2016_09 MMGs
-class FastqFile < File
-  def each_record_fast
-    count = 0
-    header = ''
-    sequence = ''
-    description = ''
-    quality = ''
-
-    begin
-      begin
-        f = Zlib::GzipReader.open(self)
-        f = IO.popen("gzip -cd #{self.path}")
-        AbortIf.logger.debug { "f is #{f.class}, #{f.inspect}" }
-      rescue Zlib::GzipFile::Error => e
-        f = self
-      end
-
-      num = 0
-      f.each_line do |line|
-        # debug line[0..10]
-        num += 1
-        line.chomp!
-
-        case count
-        when 0
-          header = line[1..-1]
-        when 1
-          sequence = line
-        when 2
-          description = line[1..-1]
-        when 3
-          count = -1
-          quality = line
-          yield(header, sequence, description, quality)
-        end
-
-        count += 1
-      end
-
-      f.close if f.instance_of?(Zlib::GzipReader)
-      STDERR.puts "DEBUG -- Total lines from pf is #{num}"
-      return f
-    ensure
-      f.close if f
-    end
-  end
-end
 
 require_relative "lib/core_ext/process"
 require_relative "lib/qc/utils"
@@ -99,12 +34,11 @@ Process.extend CoreExt::Process
 Signal.trap("PIPE", "EXIT")
 
 VERSION = "
-    Version: 0.3.2
-    Copyright: 2015 - 2016 Ryan Moore
+    Version: 0.4.0
+    Copyright: 2015 - 2017 Ryan Moore
     Contact: moorer@udel.edu
     Website: https://github.com/mooreryan/qc
     License: GPLv3
-
 "
 
 opts = Trollop.options do
@@ -118,13 +52,18 @@ opts = Trollop.options do
   Options:
   EOS
 
-  opt(:forward, "forward", type: :strings)
-  opt(:reverse, "reverse", type: :strings)
+  opt(:forward, "forward", type: :string)
+  opt(:reverse, "reverse", type: :string)
 
   opt(:threads, "Threads", type: :integer, default: 10)
 
   opt(:outdir, "Output directory", type: :string,
       default: "qc")
+
+  opt(:bowtie_idx, "The bowtie2 index to screen reads against " +
+                   "(can provide more than one)",
+      type: :strings)
+
 end
 
 TRIMMO = File.join File.dirname(__FILE__),
@@ -135,6 +74,14 @@ TRIMMO = File.join File.dirname(__FILE__),
 FLASH = File.join File.dirname(__FILE__),
                   "bin",
                   "flash"
+
+if opts[:bowtie_idx]
+  BOWTIE = `which bowtie2`.chomp
+  abort_if BOWTIE.empty?, "Missing bowtie2"
+
+  FIX_PAIRS = `which FixPairs`.chomp
+  abort_if FIX_PAIRS.empty?, "Missing FixPairs"
+end
 
 SEED_MISMATCHES = 2
 PALINDROME_CLIP_THRESHOLD = 30
@@ -161,28 +108,17 @@ now = Time.now.strftime "%Y%m%d%H%M%S%L"
 big_log = File.join opts[:outdir], "qc_log.#{now}.txt"
 baseout = File.join opts[:outdir], "reads"
 
-check_files *opts[:forward]
-check_files *opts[:reverse]
+check_files opts[:forward]
+check_files opts[:reverse]
+
+# TODO check that index files exist
 
 abort_if File.exists?(opts[:outdir]),
          "Outdir #{opts[:outdir]} already exists!"
 FileUtils.mkdir_p opts[:outdir]
 
-# only one library don't cat the files
-if opts[:forward].length == 1 && opts[:reverse].length == 1
-  AbortIf.logger.info { "Only one forward and one reverse file " +
-                        "provided. Not catting files." }
-  in_forward = opts[:forward].first
-  in_reverse = opts[:reverse].first
-else
-  AbortIf.logger.info { "Multiple libraries provided. Catting files" }
-
-  in_forward = File.join opts[:outdir], "tmp.1.fq"
-  in_reverse = File.join opts[:outdir], "tmp.2.fq"
-
-  cat_fastq_files in_forward, *opts[:forward]
-  cat_fastq_files in_reverse, *opts[:reverse]
-end
+in_forward = opts[:forward]
+in_reverse = opts[:reverse]
 
 baseout += ".adpater_trimmed"
 
@@ -248,7 +184,7 @@ check_files out_flash_1P,
 
 out_paired_1 = File.join opts[:outdir], "reads.1.fq"
 out_paired_2 = File.join opts[:outdir], "reads.2.fq"
-out_unpaired = File.join opts[:outdir], "reads.unpaired.fq"
+out_unpaired = File.join opts[:outdir], "reads.U.fq"
 
 outfasta_d = File.join opts[:outdir], "for_idba"
 FileUtils.mkdir_p outfasta_d
@@ -256,7 +192,7 @@ FileUtils.mkdir_p outfasta_d
 out_paired_interleaved_fa = File.join outfasta_d,
                                       "reads.1_and_2_interleaved.fa"
 out_unpaired_fa = File.join outfasta_d,
-                            "reads.unpaired.fa"
+                            "reads.U.fa"
 
 Process.run_it! "mv #{out_flash_1P} #{out_paired_1}"
 Process.run_it! "mv #{out_flash_2P} #{out_paired_2}"
@@ -269,27 +205,117 @@ Process.run_it! "cat " +
                 "#{out_2U} " +
                 "> #{out_unpaired}"
 
-# only one library delete infiles
-if opts[:forward].length == 1 && opts[:reverse].length == 1
-  AbortIf.logger.info { "Only one forward and one reverse file " +
-                        "provided. Not gonna delete them!" }
+Process.run_it "rm " +
+               "#{out_flash_single} " +
+               "#{out_flash_1U} " +
+               "#{out_flash_2U} " +
+               "#{out_1U} " +
+               "#{out_2U}"
 
-  Process.run_it! "rm " +
-                  "#{out_flash_single} " +
-                  "#{out_flash_1U} " +
-                  "#{out_flash_2U} " +
-                  "#{out_1U} " +
-                  "#{out_2U}"
-else
-  Process.run_it! "rm " +
-                  "#{in_forward} " +
-                  "#{in_reverse} " +
-                  "#{out_flash_single} " +
-                  "#{out_flash_1U} " +
-                  "#{out_flash_2U} " +
-                  "#{out_1U} " +
-                  "#{out_2U}"
+######################################################################
+# genome screen
+###############
+
+# Now the files are
+#   out_paired_1
+#   out_paired_2
+#   out_unpaired
+
+if opts[:bowtie_idx]
+  tmp_unpaired_reads = File.join opts[:outdir],
+                                 "all_tmpreads123094871242"
+  tmp_paired_1 = File.join opts[:outdir],
+                           "all1_tmpreads123094871242342341"
+  tmp_paired_2 = File.join opts[:outdir],
+                           "all2_tmpreads123094871242345345"
+  if File.exists? tmp_unpaired_reads
+    Process.run_it "rm #{tmp_unpaired_reads}"
+  end
+
+  if File.exists? tmp_paired_1
+    Process.run_it "rm #{tmp_paired_1}"
+  end
+
+  if File.exists? tmp_paired_2
+    Process.run_it "rm #{tmp_paired_2}"
+  end
+
+  opts[:bowtie_idx].each do |index_fname|
+    idx_base = File.basename index_fname
+
+    # make screen outdir
+    reads_that_hit_genome_dir = File.join opts[:outdir],
+                                          "those_that_hit_#{idx_base}"
+    FileUtils.mkdir_p reads_that_hit_genome_dir
+
+    # screen the reads
+    out_paired_1_good_reads, out_paired_1_bad_reads =
+                             screen!(index: index_fname,
+                                     reads: out_paired_1,
+                                     log: big_log)
+
+    out_paired_2_good_reads, out_paired_2_bad_reads =
+                             screen!(index: index_fname,
+                                     reads: out_paired_2,
+                                     log: big_log)
+
+    out_unpaired_good_reads, out_unpaired_bad_reads =
+                             screen!(index: index_fname,
+                                     reads: out_unpaired,
+                                     log: big_log)
+
+    reads_that_hit_genome = File.join reads_that_hit_genome_dir,
+                                      "reads_that_hit_#{idx_base}.U.fq"
+
+    # combine all the reads that did align
+    Process.run_it! "cat " +
+                    [out_paired_1_bad_reads,
+                     out_paired_2_bad_reads,
+                     out_unpaired_bad_reads].join(" ") +
+                    " > #{reads_that_hit_genome}"
+
+    # Delete the files that were just catted into the new file
+    Process.run_it! "rm " +
+                    [out_paired_1_bad_reads,
+                     out_paired_2_bad_reads,
+                     out_unpaired_bad_reads].join(" ")
+
+    # fix the pair info for the reads that did not hit the genome
+    out1, out2, outU = fix_pairs!(in1: out_paired_1_good_reads,
+                                  in2: out_paired_2_good_reads,
+                                  log: big_log,
+                                  outdir: opts[:outdir])
+
+    # remove the two files that went into fix pairs command
+    Process.run_it! "rm " +
+                    [out_paired_1_good_reads,
+                     out_paired_2_good_reads].join(" ")
+
+    # add the unpaired reads to the others
+    Process.run_it! "cat " +
+                    [out_unpaired_good_reads, outU].join(" ") +
+                    " >> #{tmp_unpaired_reads}"
+    Process.run_it! "rm " + [out_unpaired_good_reads, outU].join(" ")
+
+    # add the 1 reads to the tmp file
+    Process.run_it! "cat " +
+                    "#{out1} >> #{tmp_paired_1}"
+    Process.run_it "rm #{out1}"
+
+    # add the 2 reads to the tmp file
+    Process.run_it! "cat " +
+                    "#{out2} >> #{tmp_paired_2}"
+    Process.run_it "rm #{out2}"
+  end
+  # clean up
+  Process.run_it! "mv #{tmp_paired_1} #{out_paired_1}"
+  Process.run_it! "mv #{tmp_paired_2} #{out_paired_2}"
+  Process.run_it! "mv #{tmp_unpaired_reads} #{out_unpaired}"
 end
+
+###############
+# genome screen
+######################################################################
 
 
 fq2fa = `which fq2fa`.chomp

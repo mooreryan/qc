@@ -99,8 +99,8 @@ Process.extend CoreExt::Process
 Signal.trap("PIPE", "EXIT")
 
 VERSION = "
-    Version: 0.3.2
-    Copyright: 2015 - 2016 Ryan Moore
+    Version: 0.4.0
+    Copyright: 2015 - 2017 Ryan Moore
     Contact: moorer@udel.edu
     Website: https://github.com/mooreryan/qc
     License: GPLv3
@@ -164,10 +164,8 @@ baseout = File.join opts[:outdir], "reads"
 check_files *opts[:forward]
 check_files *opts[:reverse]
 
-p :ryan
 abort_if File.exists?(opts[:outdir]),
          "Outdir #{opts[:outdir]} already exists!"
-p :moore
 FileUtils.mkdir_p opts[:outdir]
 
 # only one library don't cat the files
@@ -250,7 +248,7 @@ check_files out_flash_1P,
 
 out_paired_1 = File.join opts[:outdir], "reads.1.fq"
 out_paired_2 = File.join opts[:outdir], "reads.2.fq"
-out_unpaired = File.join opts[:outdir], "reads.U.fq"
+out_unpaired = File.join opts[:outdir], "reads.unpaired.fq"
 
 outfasta_d = File.join opts[:outdir], "for_idba"
 FileUtils.mkdir_p outfasta_d
@@ -258,7 +256,7 @@ FileUtils.mkdir_p outfasta_d
 out_paired_interleaved_fa = File.join outfasta_d,
                                       "reads.1_and_2_interleaved.fa"
 out_unpaired_fa = File.join outfasta_d,
-                            "reads.U.fa"
+                            "reads.unpaired.fa"
 
 Process.run_it! "mv #{out_flash_1P} #{out_paired_1}"
 Process.run_it! "mv #{out_flash_2P} #{out_paired_2}"
@@ -271,19 +269,19 @@ Process.run_it! "cat " +
                 "#{out_2U} " +
                 "> #{out_unpaired}"
 
-# only one library, DONT delete infiles
+# only one library delete infiles
 if opts[:forward].length == 1 && opts[:reverse].length == 1
   AbortIf.logger.info { "Only one forward and one reverse file " +
-                        "provided." }
+                        "provided. Not gonna delete them!" }
 
-  Process.run_it "rm " +
+  Process.run_it! "rm " +
                   "#{out_flash_single} " +
                   "#{out_flash_1U} " +
                   "#{out_flash_2U} " +
                   "#{out_1U} " +
                   "#{out_2U}"
 else
-  Process.run_it "rm " +
+  Process.run_it! "rm " +
                   "#{in_forward} " +
                   "#{in_reverse} " +
                   "#{out_flash_single} " +

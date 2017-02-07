@@ -45,10 +45,16 @@ module QC
 
         Process.run_it! cmd
       else
-        warn "WARN: no reads in #{inf}"
+        AbortIf.logger.warn { "No reads in #{inf}. Not running " +
+                              "qual_trim_se!()" }
+
+        # Make a empty placeholder file
+        Process.run_it! "touch #{out}"
+
+        AbortIf.logger.info { "Made fake file #{out}" }
       end
 
-      Process.run_it! "rm #{inf}"
+      Process.run_it "rm #{inf}"
 
       out
     end
@@ -64,7 +70,7 @@ module QC
                                ">> #{log} 2>&1"
 
       Process.run_it! cmd
-      Process.run_it! "rm #{in1} #{in2}"
+      Process.run_it "rm #{in1} #{in2}"
     end
 
     def flash! in1:, in2:, outdir:, log:
@@ -78,7 +84,7 @@ module QC
                         ">> #{log} 2>&1"
 
       Process.run_it! cmd
-      Process.run_it! "rm #{in1} #{in2}"
+      Process.run_it "rm #{in1} #{in2}"
       Process.run_it!("mv #{outdir}/flashed.extendedFrags.fastq " +
                       "#{outdir}/../reads.adapter_trimmed.flash_combined")
       Process.run_it!("mv #{outdir}/flashed.notCombined_1.fastq " +
@@ -104,12 +110,12 @@ module QC
       Process.run_it! cmd
     end
 
-    def screen!(reads:, log:)
+    def screen!(index:, reads:, log:)
       # use bowtie2 to screen reads against against a genome
-      good_reads = reads + ".did_not_align_to_bos_taurus.fq"
-      bad_reads  = reads + ".did_align_to_bos_taurus.fq"
+      good_reads = reads + ".did_not_align.fq"
+      bad_reads  = reads + ".did_align.fq"
 
-      cmd = "#{BOWTIE} -x #{BOWTIE_IDX} " +
+      cmd = "#{BOWTIE} -x #{index} " +
             "-U #{reads} " +
             "--sensitive --end-to-end " +
             "--threads #{THREADS} " +
