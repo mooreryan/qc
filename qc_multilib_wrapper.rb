@@ -9,7 +9,7 @@ require "fileutils"
 
 require_relative "lib/core_ext/process"
 require_relative "lib/qc/utils"
-
+require_relative "lib/qc/version"
 
 include AbortIf
 include QC::Utils
@@ -18,7 +18,7 @@ Process.extend CoreExt::Process
 
 
 VERSION = "
-    Version: 0.4.0
+    Version: #{QC::Version::VERSION}
     Copyright: 2015 - 2017 Ryan Moore
     Contact: moorer@udel.edu
     Website: https://github.com/mooreryan/qc
