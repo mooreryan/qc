@@ -366,5 +366,9 @@ else
 
 end
 
+done_file = File.join(opts[:outdir],
+                      "qc_v#{QC::Version::VERSION}_done")
+Process.run_it "touch #{done_file}"
+
 AbortIf.logger.info { "QC finished" }
 AbortIf.logger.info { "Output directory: #{opts[:outdir]}" }
