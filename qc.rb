@@ -34,7 +34,7 @@ Process.extend CoreExt::Process
 Signal.trap("PIPE", "EXIT")
 
 VERSION = "
-    Version: 0.4.0
+    Version: 0.4.1
     Copyright: 2015 - 2017 Ryan Moore
     Contact: moorer@udel.edu
     Website: https://github.com/mooreryan/qc
@@ -48,6 +48,10 @@ opts = Trollop.options do
 #{VERSION}
 
   Run QC pipeline on Illumina reads.
+
+  It is HARDCODED to use phred33 right now (new illumina, sanger) as
+  sometimes very few reads will be in the 1U and 2U files and
+  Trimmomatic can't determine it. q
 
   Options:
   EOS

@@ -37,6 +37,7 @@ module QC
       if count >= 1
         cmd = "java -jar #{TRIMMO} SE " +
               "-threads #{THREADS} " +
+              "-phred33 " +
               "#{inf} " +
               "#{out} " +
               "SLIDINGWINDOW:#{WINDOW_SIZE}:#{QUAL} " +
@@ -62,6 +63,7 @@ module QC
     def qual_trim_pe! in1:, in2:, baseout:, log:
                          cmd = "java -jar #{TRIMMO} PE " +
                                "-threads #{THREADS} " +
+                               "-phred33 " +
                                "#{in1} " +
                                "#{in2} " +
                                "-baseout #{baseout} " +
@@ -98,6 +100,7 @@ module QC
       cmd = "java -jar #{TRIMMO} PE " +
             "-threads #{THREADS} " +
             "-baseout #{baseout} " +
+            "-phred33 " +
             "#{in1} " +
             "#{in2} " +
             "ILLUMINACLIP:" +
