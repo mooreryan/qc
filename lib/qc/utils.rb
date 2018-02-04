@@ -40,6 +40,7 @@ module QC
               "-phred33 " +
               "#{inf} " +
               "#{out} " +
+              "HEADCROP:#{HEADCROP} " +
               "SLIDINGWINDOW:#{WINDOW_SIZE}:#{QUAL} " +
               "MINLEN:#{MIN_LEN} " +
               ">> #{log} 2>&1"
@@ -67,6 +68,7 @@ module QC
                                "#{in1} " +
                                "#{in2} " +
                                "-baseout #{baseout} " +
+                               "HEADCROP:#{HEADCROP} " +
                                "SLIDINGWINDOW:#{WINDOW_SIZE}:#{QUAL} " +
                                "MINLEN:#{MIN_LEN} " +
                                ">> #{log} 2>&1"
@@ -113,6 +115,8 @@ module QC
       Process.run_it! cmd
     end
 
+    # Treat all reads as unpaired so that --un gives all reads that
+    # did not align to the genome.
     def screen!(index:, reads:, log:)
       # use bowtie2 to screen reads against against a genome
       good_reads = reads + ".did_not_align.fq"

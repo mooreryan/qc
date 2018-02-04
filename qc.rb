@@ -1,6 +1,6 @@
 #!/usr/bin/env ruby
 
-# Copyright 2015 - 2016 Ryan Moore
+# Copyright 2015 - 2018 Ryan Moore
 # Contact: moorer@udel.edu
 #
 # This program is free software: you can redistribute it and/or modify
@@ -36,7 +36,7 @@ Signal.trap("PIPE", "EXIT")
 
 VERSION = "
     Version: #{QC::Version::VERSION}
-    Copyright: 2015 - 2017 Ryan Moore
+    Copyright: 2015 - 2018 Ryan Moore
     Contact: moorer@udel.edu
     Website: https://github.com/mooreryan/qc
     License: GPLv3
@@ -52,7 +52,7 @@ opts = Trollop.options do
 
   It is HARDCODED to use phred33 right now (new illumina, sanger) as
   sometimes very few reads will be in the 1U and 2U files and
-  Trimmomatic can't determine it. q
+  Trimmomatic can't determine it.
 
   Options:
   EOS
@@ -62,11 +62,21 @@ opts = Trollop.options do
 
   opt(:threads, "Threads", type: :integer, default: 10)
 
-  opt(:outdir, "Output directory", type: :string,
+  opt(:outdir,
+      "Output directory",
+      type: :string,
       default: "qc")
+  opt(:gzip_output,
+      "Compress output or not.",
+      default: true)
 
-  opt(:bowtie_idx, "The bowtie2 index to screen reads against " +
-                   "(can provide more than one)",
+  opt(:headcrop,
+      "Remove N number of bases from the start of reads",
+      short: "c",
+      default: 0)
+  opt(:bowtie_idx,
+      "The bowtie2 index to screen reads against " +
+      "(can provide more than one)",
       type: :strings)
 
 end
@@ -87,6 +97,10 @@ if opts[:bowtie_idx]
   FIX_PAIRS = `which FixPairs`.chomp
   abort_if FIX_PAIRS.empty?, "Missing FixPairs"
 end
+
+
+
+HEADCROP = opts[:headcrop]
 
 SEED_MISMATCHES = 2
 PALINDROME_CLIP_THRESHOLD = 30
@@ -191,13 +205,6 @@ out_paired_1 = File.join opts[:outdir], "reads.1.fq"
 out_paired_2 = File.join opts[:outdir], "reads.2.fq"
 out_unpaired = File.join opts[:outdir], "reads.U.fq"
 
-outfasta_d = File.join opts[:outdir], "for_idba"
-FileUtils.mkdir_p outfasta_d
-
-out_paired_interleaved_fa = File.join outfasta_d,
-                                      "reads.1_and_2_interleaved.fa"
-out_unpaired_fa = File.join outfasta_d,
-                            "reads.U.fa"
 
 Process.run_it! "mv #{out_flash_1P} #{out_paired_1}"
 Process.run_it! "mv #{out_flash_2P} #{out_paired_2}"
@@ -227,24 +234,9 @@ Process.run_it "rm " +
 #   out_unpaired
 
 if opts[:bowtie_idx]
-  tmp_unpaired_reads = File.join opts[:outdir],
-                                 "all_tmpreads123094871242"
-  tmp_paired_1 = File.join opts[:outdir],
-                           "all1_tmpreads123094871242342341"
-  tmp_paired_2 = File.join opts[:outdir],
-                           "all2_tmpreads123094871242345345"
-  if File.exists? tmp_unpaired_reads
-    Process.run_it "rm #{tmp_unpaired_reads}"
-  end
 
-  if File.exists? tmp_paired_1
-    Process.run_it "rm #{tmp_paired_1}"
-  end
-
-  if File.exists? tmp_paired_2
-    Process.run_it "rm #{tmp_paired_2}"
-  end
-
+  # Each iteration will replace the out_paired_? variables with the
+  # reads that make it through the screen.
   opts[:bowtie_idx].each do |index_fname|
     idx_base = File.basename index_fname
 
@@ -296,74 +288,55 @@ if opts[:bowtie_idx]
                     [out_paired_1_good_reads,
                      out_paired_2_good_reads].join(" ")
 
-    # add the unpaired reads to the others
+    # Replace the old out_unpaired file with the new clean reads.
     Process.run_it! "cat " +
                     [out_unpaired_good_reads, outU].join(" ") +
-                    " >> #{tmp_unpaired_reads}"
+                    " > #{out_unpaired}"
     Process.run_it! "rm " + [out_unpaired_good_reads, outU].join(" ")
 
-    # add the 1 reads to the tmp file
+    # Replece the old out_paired_1 file with the new screened paired 1
+    # reads.
     Process.run_it! "cat " +
-                    "#{out1} >> #{tmp_paired_1}"
+                    "#{out1} > #{out_paired_1}"
     Process.run_it "rm #{out1}"
 
-    # add the 2 reads to the tmp file
+    # Replece the old out_paired_1 file with the new screened paired 1
+    # reads.
     Process.run_it! "cat " +
-                    "#{out2} >> #{tmp_paired_2}"
+                    "#{out2} > #{out_paired_2}"
     Process.run_it "rm #{out2}"
   end
-  # clean up
-  Process.run_it! "mv #{tmp_paired_1} #{out_paired_1}"
-  Process.run_it! "mv #{tmp_paired_2} #{out_paired_2}"
-  Process.run_it! "mv #{tmp_unpaired_reads} #{out_unpaired}"
 end
 
 ###############
 # genome screen
 ######################################################################
 
+if opts[:compress_output]
+  pigz = `which pigz`.chomp
+  if pigz.empty?
+    gzip = `which gzip`.chomp
 
-fq2fa = `which fq2fa`.chomp
-if fq2fa.empty?
-  AbortIf.logger.warn { "Cannot locate fq2fa program. No IDBA " +
-                        "files will be made" }
-else
-  Process.run_it! "#{fq2fa} " +
-                  "--filter " +
-                  "--merge " +
-                  "#{out_paired_1} " +
-                  "#{out_paired_2} " +
-                  "#{out_paired_interleaved_fa}"
-
-  Process.run_it! "#{fq2fa} " +
-                  "--filter " +
-                  "#{out_unpaired} " +
-                  "#{out_unpaired_fa}"
-end
-
-pigz = `which pigz`.chomp
-if pigz.empty?
-  gzip = `which gzip`.chomp
-
-  if gzip.empty?
-    AbortIf.logger.warn { "Cannot locate pigz or gzip. Output " +
-                          "files will not be zipped." }
+    if gzip.empty?
+      AbortIf.logger.warn { "Cannot locate pigz or gzip. Output " +
+                            "files will not be zipped." }
+    else
+      Process.run_it "#{gzip} " +
+                     "#{out_unpaired} " +
+                     "#{out_unpaired_fa} " +
+                     "#{out_paired_1} " +
+                     "#{out_paired_2} " +
+                     "#{out_paired_interleaved_fa}"
+    end
   else
-    Process.run_it "#{gzip} " +
-                    "#{out_unpaired} " +
-                    "#{out_unpaired_fa} " +
-                    "#{out_paired_1} " +
-                    "#{out_paired_2} " +
-                    "#{out_paired_interleaved_fa}"
-  end
-else
-  Process.run_it "#{pigz} --best --processes #{THREADS} " +
-                 "#{out_unpaired} " +
-                 "#{out_unpaired_fa} " +
-                 "#{out_paired_1} " +
-                 "#{out_paired_2} " +
-                 "#{out_paired_interleaved_fa}"
+    Process.run_it "#{pigz} --processes #{THREADS} " +
+                   "#{out_unpaired} " +
+                   "#{out_unpaired_fa} " +
+                   "#{out_paired_1} " +
+                   "#{out_paired_2} " +
+                   "#{out_paired_interleaved_fa}"
 
+  end
 end
 
 done_file = File.join(opts[:outdir],
