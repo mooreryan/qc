@@ -34,16 +34,8 @@ Process.extend CoreExt::Process
 
 Signal.trap("PIPE", "EXIT")
 
-VERSION = "
-    Version: #{QC::Version::VERSION}
-    Copyright: 2015 - 2019 Ryan Moore
-    Contact: moorer@udel.edu
-    Website: https://github.com/mooreryan/qc
-    License: GPLv3
-"
-
 opts = Optimist.options do
-  version QC::Version::VERSION
+  version QC::Version::VERSION_BANNER
 
   banner <<-EOS
 #{VERSION}
