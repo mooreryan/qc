@@ -19,7 +19,7 @@
 
 Signal.trap("PIPE", "EXIT")
 
-require "trollop"
+require "optimist"
 require "abort_if"
 require "systemu"
 require "fileutils"
@@ -36,15 +36,15 @@ Process.extend CoreExt::Process
 
 VERSION = "
     Version: #{QC::Version::VERSION}
-    Copyright: 2015 - 2018 Ryan Moore
+    Copyright: 2015 - 2019 Ryan Moore
     Contact: moorer@udel.edu
     Website: https://github.com/mooreryan/qc
     License: GPLv3
 
 "
 
-opts = Trollop.options do
-  version VERSION
+opts = Optimist.options do
+  version QC::Version::VERSION
 
   banner <<-EOS
 #{VERSION}

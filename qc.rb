@@ -20,7 +20,7 @@
 require "abort_if"
 require "systemu"
 require "fileutils"
-require "trollop"
+require "optimist"
 
 require_relative "lib/core_ext/process"
 require_relative "lib/qc/utils"
@@ -36,14 +36,14 @@ Signal.trap("PIPE", "EXIT")
 
 VERSION = "
     Version: #{QC::Version::VERSION}
-    Copyright: 2015 - 2018 Ryan Moore
+    Copyright: 2015 - 2019 Ryan Moore
     Contact: moorer@udel.edu
     Website: https://github.com/mooreryan/qc
     License: GPLv3
 "
 
-opts = Trollop.options do
-  version VERSION
+opts = Optimist.options do
+  version QC::Version::VERSION
 
   banner <<-EOS
 #{VERSION}
@@ -86,9 +86,8 @@ TRIMMO = File.join File.dirname(__FILE__),
                    "trimmomatic-0.35",
                    "trimmomatic-0.35.jar"
 
-FLASH = File.join File.dirname(__FILE__),
-                  "bin",
-                  "flash"
+FLASH = `which flash`.chomp
+abort_if FLASH.empty?, "Missing flash"
 
 if opts[:bowtie_idx]
   BOWTIE = `which bowtie2`.chomp
@@ -312,7 +311,7 @@ end
 # genome screen
 ######################################################################
 
-if opts[:compress_output]
+if opts[:gzip_output]
   pigz = `which pigz`.chomp
   if pigz.empty?
     gzip = `which gzip`.chomp
@@ -323,18 +322,14 @@ if opts[:compress_output]
     else
       Process.run_it "#{gzip} " +
                      "#{out_unpaired} " +
-                     "#{out_unpaired_fa} " +
                      "#{out_paired_1} " +
-                     "#{out_paired_2} " +
-                     "#{out_paired_interleaved_fa}"
+                     "#{out_paired_2}"
     end
   else
     Process.run_it "#{pigz} --processes #{THREADS} " +
                    "#{out_unpaired} " +
-                   "#{out_unpaired_fa} " +
                    "#{out_paired_1} " +
-                   "#{out_paired_2} " +
-                   "#{out_paired_interleaved_fa}"
+                   "#{out_paired_2}"
 
   end
 end
