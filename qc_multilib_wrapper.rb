@@ -36,7 +36,7 @@ opts = Optimist.options do
   version QC::Version::VERSION_BANNER
 
   banner <<-EOS
-#{VERSION}
+#{QC::Version::VERSION_BANNER}
 
   When you don't want your libraries combined into one big set of
   reads, use this wrapper instead of the qc.rb script.

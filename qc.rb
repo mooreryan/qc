@@ -38,7 +38,7 @@ opts = Optimist.options do
   version QC::Version::VERSION_BANNER
 
   banner <<-EOS
-#{VERSION}
+#{QC::Version::VERSION_BANNER}
 
   Run QC pipeline on Illumina reads.
 
