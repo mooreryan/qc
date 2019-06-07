@@ -4,8 +4,15 @@ A pipeline for Illumina read QC using `Trimmomatic` and `Flash`.
 
 ## Installation
 
-This assumes you already have a working version of Ruby on your system.
+### Docker
 
+There is a Docker image with everything you need to run the pipeline [here](https://hub.docker.com/r/mooreryan/qc).
+
+### The hard way
+
+If you don't want to use Docker you need to first meet all the dependencies in the [dependencies](#dependencies) section, then do the following.
+
+This assumes you already have a working version of Ruby on your system.
 
 ```bash
 # Download the code.
