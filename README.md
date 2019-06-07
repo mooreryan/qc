@@ -9,13 +9,13 @@ This assumes you already have a working version of Ruby on your system.
 
 ```bash
 # Download the code.
-wget https://github.com/mooreryan/qc/archive/v0.5.2.tar.gz
+wget https://github.com/mooreryan/qc/archive/v0.5.4.tar.gz
 
 # Extract the source code from the archive.
-tar xzf v0.5.2.tar.gz
+tar xzf v0.5.4.tar.gz
 
 # Enter source directory
-cd qc-0.5.2
+cd qc-0.5.4
 
 # Change the permissions for the two pipeline scripts.
 chmod 755 qc.rb && qc_multilib_wrapper.rb
