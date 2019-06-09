@@ -3,5 +3,6 @@ bin/flash
 vendor/lib/FLASH-1.2.11/*.o
 vendor/lib/FLASH-1.2.11/flash
 test_files/output/
+test_files/test_output/
 bowtie_indices
 my_bin

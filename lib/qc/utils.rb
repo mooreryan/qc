@@ -1,3 +1,5 @@
+require "securerandom"
+
 module QC
   module Utils
     def cat_fastq_files outf, *fnames
@@ -137,7 +139,8 @@ module QC
     end
 
     def fix_pairs!(in1:, in2:, outdir:, log:)
-      basename = File.join outdir, "ryanapplehehe"
+      basename = File.join outdir,
+                           "qc_#{SecureRandom.hex(20)}"
 
       cmd = "#{FIX_PAIRS} #{in1} #{in2} #{basename} " +
             ">> #{log} 2>&1"

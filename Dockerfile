@@ -1,6 +1,7 @@
 FROM mooreryan/build_essentials:0.1.0
 LABEL maintainer="moorer@udel.edu"
 
+ARG pipeline_version="0.5.5"
 ARG software=/home/software
 
 WORKDIR ${software}
@@ -44,11 +45,11 @@ RUN rm FLASH-1.2.11-Linux-x86_64.tar.gz
 # QC pipeline
 
 ## Download the source code
-RUN wget https://github.com/mooreryan/qc/archive/v0.5.4.tar.gz
+RUN wget https://github.com/mooreryan/qc/archive/v${pipeline_version}.tar.gz
 ## Extract the source code from the archive.
-RUN tar xzf v0.5.4.tar.gz
+RUN tar xzf v${pipeline_version}.tar.gz
 ## Move into the directory of the source code.
-WORKDIR qc-0.5.4
+WORKDIR qc-${pipeline_version}
 ## Change the permissions for the two pipeline scripts.
 RUN chmod 755 qc.rb
 RUN chmod 755 qc_multilib_wrapper.rb
@@ -57,9 +58,9 @@ RUN bundle install
 ## Move back to original working directory
 WORKDIR ${software}
 ## Update the PATH variable with the QC pipeline directory.
-ENV PATH=${PATH}:${software}/qc-0.5.4
+ENV PATH=${PATH}:${software}/qc-${pipeline_version}
 ## Remove the original archive.
-RUN rm v0.5.4.tar.gz
+RUN rm v${pipeline_version}.tar.gz
 
 # Set the working directory back to /home
 WORKDIR /home
