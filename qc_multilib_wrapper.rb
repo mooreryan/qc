@@ -38,16 +38,46 @@ opts = Optimist.options do
   banner <<-EOS
 #{QC::Version::VERSION_BANNER}
 
-  When you don't want your libraries combined into one big set of
-  reads, use this wrapper instead of the qc.rb script.
+  Run QC pipeline on Illumina reads.
 
-  You can also use this if you only have one library as well.
+  When specifying forward and reverse reads, you could use globs like
+  this: --forward my_reads/*.1.fq.gz --reverse my_reads/*.2.fq.gz
+
+  Gives each library its own nice little folder.  It assumes that the
+  sample name is in the reads (it gets the sample name from the
+  forward reads specifically).  For example, any of the following
+  would be considered to have the sample name RI_1A1:
+
+    - RI_1A1.1.fq.gz
+    - RI_1A1.1.fq.bz2
+    - RI_1A1.1.fastq.gz
+    - RI_1A1.1.fastq.bz2
+    - RI_1A1.f.fq.gz
+    - RI_1A1.f.fq.bz2
+    - RI_1A1.f.fastq.gz
+    - RI_1A1.f.fastq.bz2
+    - RI_1A1.forward.fq.gz
+    - RI_1A1.forward.fq.bz2
+    - RI_1A1.forward.fastq.gz
+    - RI_1A1.forward.fastq.bz2
+
+  Also note that the sample name will be determined if the reads do
+  not end in `.gz` or `.bz2` as well.  Finally, the letters can be
+  upper or lowercase, and it should turn out okay.
+
+  If the pipeline actually finishes, it will put an empty file in the
+  outdirectory called qc_v#{QC::Version::VERSION}_done.
+
+  Don't forget to check the log file and make sure everything looks
+  good!!! (Both the log that this program writes to stderr as well as
+  the one in the final output directory...they report different
+  things.)
 
   Options:
   EOS
 
-  opt(:forward, "forward", type: :strings)
-  opt(:reverse, "reverse", type: :strings)
+  opt(:forward, "forward reads", type: :strings)
+  opt(:reverse, "reverse reads", type: :strings)
 
   opt(:threads, "Threads", type: :integer, default: 10)
 
@@ -59,10 +89,33 @@ opts = Optimist.options do
       "Compress output or not.",
       default: true)
 
-  opt(:headcrop,
+  opt(:trimmomatic_headcrop,
       "Remove N number of bases from the start of reads",
       short: "c",
       default: 0)
+  opt(:trimmomatic_seed_mismatches,
+      "Seed mismatches for trimmomatic",
+      default: 2)
+  opt(:trimmomatic_palindrome_clip_threshold,
+      "Palindrome clip threshold for trimmomatic",
+      default: 30)
+  opt(:trimmomatic_simple_clip_threshold,
+      "Simple clip threshold for trimmomatic",
+      default: 10)
+  opt(:trimmomatic_window_size,
+      "Window size for trimmomatic",
+      default: 4)
+  opt(:trimmomatic_window_quality,
+      "Window quality for trimmomatic",
+      default: 15)
+  opt(:trimmomatic_min_len,
+      "Min. length for trimmomatic",
+      default: 50)
+
+  opt(:flash_max_overlap,
+      "Max. overlap before penalty for FLASH",
+      default: 250)
+
   opt(:bowtie_idx,
       "The bowtie2 index to screen reads against " +
       "(can provide more than one)",
@@ -86,27 +139,43 @@ opts[:forward].each_with_index do |for_f, idx|
   AbortIf.logger.info { "Working on lib ##{idx} " +
                         "(#{for_f} and #{rev_f})" }
 
-  basename = File.basename for_f
+  basename = remove_fq_ext File.basename(for_f)
 
   outd = File.join opts[:outdir], basename
 
   if opts[:bowtie_idx]
     cmd = "ruby #{qc} " +
-          "-f #{for_f} " +
-          "-r #{rev_f} " +
-          "-t #{opts[:threads]} " +
-          "-g #{opts[:gzip_output]} " +
-          "-c #{opts[:headcrop]} " +
-          "-o #{outd} " +
-          "-b #{opts[:bowtie_idx].join(" ")}"
+          "--forward #{for_f} " +
+          "--reverse #{rev_f} " +
+          "--threads #{opts[:threads]} " +
+          "--gzip-output #{opts[:gzip_output]} " +
+          "--trimmomatic-headcrop #{opts[:trimmomatic_headcrop]} " +
+          "--trimmomatic-seed-mismatches #{opts[:trimmomatic_seed_mismatches]} " +
+          "--trimmomatic-palindrome-clip-threshold #{opts[:trimmomatic_palindrome_clip_threshold]} " +
+          "--trimmomatic-simple-clip-threshold #{opts[:trimmomatic_simple_clip_threshold]} " +
+          "--trimmomatic-window-size #{opts[:trimmomatic_window_size]} " +
+          "--trimmomatic-window-quality #{opts[:trimmomatic_window_quality]} " +
+          "--trimmomatic-min-len #{opts[:trimmomatic_min_len]} " +
+          "--flash-max-overlap #{opts[:flash_max_overlap]} " +
+          "--outdir #{outd} " +
+          "--basename #{basename} " +
+          "--bowtie-idx #{opts[:bowtie_idx].join(" ")}"
   else
     cmd = "ruby #{qc} " +
-          "-f #{for_f} " +
-          "-r #{rev_f} " +
-          "-t #{opts[:threads]} " +
-          "-g #{opts[:gzip_output]} " +
-          "-c #{opts[:headcrop]} " +
-          "-o #{outd}"
+          "--forward #{for_f} " +
+          "--reverse #{rev_f} " +
+          "--threads #{opts[:threads]} " +
+          "--gzip-output #{opts[:gzip_output]} " +
+          "--trimmomatic-headcrop #{opts[:trimmomatic_headcrop]} " +
+          "--trimmomatic-seed-mismatches #{opts[:trimmomatic_seed_mismatches]} " +
+          "--trimmomatic-palindrome-clip-threshold #{opts[:trimmomatic_palindrome_clip_threshold]} " +
+          "--trimmomatic-simple-clip-threshold #{opts[:trimmomatic_simple_clip_threshold]} " +
+          "--trimmomatic-window-size #{opts[:trimmomatic_window_size]} " +
+          "--trimmomatic-window-quality #{opts[:trimmomatic_window_quality]} " +
+          "--trimmomatic-min-len #{opts[:trimmomatic_min_len]} " +
+          "--flash-max-overlap #{opts[:flash_max_overlap]} " +
+          "--outdir #{outd} " +
+          "--basename #{basename}"
   end
 
   Process.run_it! cmd

@@ -10,16 +10,16 @@ reverse_reads = $(test_d)/*.2.fq.gz
 threads = 2
 
 test_qc:
-	rm -r $(test_outd); ./qc.rb -f $(forward_reads) -r $(reverse_reads) -t $(threads) -o $(test_outd) --gzip-output
+	rm -r $(test_outd); ./qc.rb -f $(test_d)/six.1.fq.gz -r $(test_d)/six.2.fq.gz -t $(threads) -o $(test_outd) --gzip-output --basename apple_pie
 
 test_qc_bowtie:
-	rm -r $(test_outd); ./qc.rb -f $(forward_reads) -r $(reverse_reads) -t $(threads) -o $(test_outd) --gzip-output -b $(bowtie_index)
+	rm -r $(test_outd); ./qc.rb -f $(test_d)/six.1.fq.gz -r $(test_d)/six.2.fq.gz -t $(threads) -o $(test_outd) --gzip-output --bowtie-idx $(bowtie_index)
 
 test_qc_multilib:
 	rm -r $(test_outd); ./qc_multilib_wrapper.rb -f $(forward_reads) -r $(reverse_reads) -t $(threads) -o $(test_outd) --gzip-output
 
 test_qc_multilib_bowtie:
-	rm -r $(test_outd); ./qc_multilib_wrapper.rb -f $(forward_reads) -r $(reverse_reads) -t $(threads) -o $(test_outd) --gzip-output -b $(bowtie_index)
+	rm -r $(test_outd); ./qc_multilib_wrapper.rb -f $(forward_reads) -r $(reverse_reads) -t $(threads) -o $(test_outd) --gzip-output --bowtie-idx $(bowtie_index)
 
 
 test: test_qc test_qc_bowtie test_qc_multilib test_qc_multilib_bowtie

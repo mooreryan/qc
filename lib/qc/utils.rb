@@ -24,6 +24,33 @@ module QC
       $stderr.puts msg
     end
 
+    # Tries to remove some common sequence file extensions from the
+    # given string.
+    #
+    # Any of would output just 'apple'....
+    # apple.1.fq.gz
+    # apple.1.fq
+    # apple.2.fq.gz
+    # apple.2.fq
+    # apple.1.fastq.gz
+    # apple.1.fastq
+    # apple.2.fastq.gz
+    # apple.2.fastq
+    # apple.1.fq.bz2
+    # apple.1.fq
+    # apple.2.fq.bz2
+    # apple.2.fq
+    # apple.1.fastq.bz2
+    # apple.1.fastq
+    # apple.2.fastq.bz2
+    # apple.2.fastQ
+    # apple.r.fq
+    # apple.forward.fq.bz2
+    # apple.for.fastQ.gz
+    def remove_fq_ext str
+      str.sub(/\.(?:[12]|[fr]|forward|reverse|for|rev)\.(?:fq|fastq)\.*(?:gz|bz2)*/i, "")
+    end
+
     def seqcount fname
       if fname.match(/.gz$/)
         num_seqs = (`gunzip -c #{fname} | wc -l`.to_f / 4).round
@@ -92,11 +119,11 @@ module QC
       Process.run_it! cmd
       Process.run_it "rm #{in1} #{in2}"
       Process.run_it!("mv #{outdir}/flashed.extendedFrags.fastq " +
-                      "#{outdir}/../reads.adapter_trimmed.flash_combined")
+                      "#{outdir}/../#{BASENAME}.adapter_trimmed.flash_combined")
       Process.run_it!("mv #{outdir}/flashed.notCombined_1.fastq " +
-                      "#{outdir}/../reads.adapter_trimmed.flash_notcombined_1P")
+                      "#{outdir}/../#{BASENAME}.adapter_trimmed.flash_notcombined_1P")
       Process.run_it!("mv #{outdir}/flashed.notCombined_2.fastq " +
-                      "#{outdir}/../reads.adapter_trimmed.flash_notcombined_2P")
+                      "#{outdir}/../#{BASENAME}.adapter_trimmed.flash_notcombined_2P")
     end
 
     def adapter_trim!(in1:, in2:, baseout:, log:)

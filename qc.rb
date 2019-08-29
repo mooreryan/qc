@@ -46,6 +46,13 @@ opts = Optimist.options do
   sometimes very few reads will be in the 1U and 2U files and
   Trimmomatic can't determine it.
 
+  This version of the pipeline only works with a single forward and a
+  single reverse read set.  If you git it a glob like reads/*.1.fq it
+  will just use the first one.
+
+  If you think you want to use this program, you probably really want
+  to use qc_multilib_wrapper.rb instead.
+
   Options:
   EOS
 
@@ -54,6 +61,9 @@ opts = Optimist.options do
 
   opt(:threads, "Threads", type: :integer, default: 10)
 
+  opt(:basename,
+      "Basename for read files",
+      default: "reads")
   opt(:outdir,
       "Output directory",
       type: :string,
@@ -62,10 +72,33 @@ opts = Optimist.options do
       "Compress output or not.",
       default: true)
 
-  opt(:headcrop,
+  opt(:trimmomatic_headcrop,
       "Remove N number of bases from the start of reads",
       short: "c",
       default: 0)
+  opt(:trimmomatic_seed_mismatches,
+      "Seed mismatches for trimmomatic",
+      default: 2)
+  opt(:trimmomatic_palindrome_clip_threshold,
+      "Palindrome clip threshold for trimmomatic",
+      default: 30)
+  opt(:trimmomatic_simple_clip_threshold,
+      "Simple clip threshold for trimmomatic",
+      default: 10)
+  opt(:trimmomatic_window_size,
+      "Window size for trimmomatic",
+      default: 4)
+  opt(:trimmomatic_window_quality,
+      "Window quality for trimmomatic",
+      default: 15)
+  opt(:trimmomatic_min_len,
+      "Min. length for trimmomatic",
+      default: 50)
+
+  opt(:flash_max_overlap,
+      "Max. overlap before penalty for FLASH",
+      default: 250)
+
   opt(:bowtie_idx,
       "The bowtie2 index to screen reads against " +
       "(can provide more than one)",
@@ -89,21 +122,24 @@ if opts[:bowtie_idx]
   abort_if FIX_PAIRS.empty?, "Missing FixPairs"
 end
 
+abort_if opts[:basename].empty?,
+         "--basename option was empty!"
 
+BASENAME = opts[:basename]
 
-HEADCROP = opts[:headcrop]
+HEADCROP = opts[:trimmomatic_headcrop]
 
-SEED_MISMATCHES = 2
-PALINDROME_CLIP_THRESHOLD = 30
-SIMPLE_CLIP_THRESHOLD = 10
+SEED_MISMATCHES = opts[:trimmomatic_seed_mismatches]
+PALINDROME_CLIP_THRESHOLD = opts[:trimmomatic_palindrome_clip_threshold]
+SIMPLE_CLIP_THRESHOLD = opts[:trimmomatic_simple_clip_threshold]
 
-WINDOW_SIZE = 4
-QUAL = 15
+WINDOW_SIZE = opts[:trimmomatic_window_size]
+QUAL = opts[:trimmomatic_window_quality]
 THREADS = opts[:threads]
 
-MIN_LEN = 50
+MIN_LEN = opts[:trimmomatic_min_len]
 
-MAX_OVERLAP = 250
+MAX_OVERLAP = opts[:flash_max_overlap]
 
 TRIMSEQS = File.join File.dirname(__FILE__),
                      "bin",
@@ -116,7 +152,9 @@ abort_if java.empty?, "Missing java"
 
 now = Time.now.strftime "%Y%m%d%H%M%S%L"
 big_log = File.join opts[:outdir], "qc_log.#{now}.txt"
-baseout = File.join opts[:outdir], "reads"
+baseout = File.join opts[:outdir], BASENAME
+
+p opts
 
 check_files opts[:forward]
 check_files opts[:reverse]
@@ -156,12 +194,12 @@ flash_dir = File.join opts[:outdir], "flash"
 flash!(in1: out_1P, in2: out_2P, outdir: flash_dir, log: big_log)
 
 out_flash_single = File.join opts[:outdir],
-                             "reads.adapter_trimmed.flash_combined"
+                             "#{BASENAME}.adapter_trimmed.flash_combined"
 out_flash_1P = File.join opts[:outdir],
-                         "reads.adapter_trimmed.flash_notcombined_1P"
+                         "#{BASENAME}.adapter_trimmed.flash_notcombined_1P"
 
 out_flash_2P = File.join opts[:outdir],
-                         "reads.adapter_trimmed.flash_notcombined_2P"
+                         "#{BASENAME}.adapter_trimmed.flash_notcombined_2P"
 
 check_files out_flash_single, out_flash_1P, out_flash_2P
 
@@ -192,9 +230,9 @@ check_files out_flash_1P,
             out_1U,
             out_2U
 
-out_paired_1 = File.join opts[:outdir], "reads.1.fq"
-out_paired_2 = File.join opts[:outdir], "reads.2.fq"
-out_unpaired = File.join opts[:outdir], "reads.U.fq"
+out_paired_1 = File.join opts[:outdir], "#{BASENAME}.1.fq"
+out_paired_2 = File.join opts[:outdir], "#{BASENAME}.2.fq"
+out_unpaired = File.join opts[:outdir], "#{BASENAME}.U.fq"
 
 
 Process.run_it! "mv #{out_flash_1P} #{out_paired_1}"
