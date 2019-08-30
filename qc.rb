@@ -145,7 +145,7 @@ TRIMSEQS = File.join File.dirname(__FILE__),
                      "bin",
                      "trimmomatic-0.35",
                      "adapters",
-                     "TruSeq3-PE-both.fa"
+                     "all.fa"
 
 java = `which java`.chomp
 abort_if java.empty?, "Missing java"
