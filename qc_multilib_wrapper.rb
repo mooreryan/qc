@@ -133,6 +133,9 @@ opts = Optimist.options do
       "The bowtie2 index to screen reads against " +
       "(can provide more than one)",
       type: :strings)
+  opt(:bowtie_seed,
+      "The seed for bowtie",
+      default: 123123)
 end
 
 check_files *opts[:forward]
@@ -174,7 +177,8 @@ opts[:forward].each_with_index do |for_f, idx|
           "--flash-max-overlap #{opts[:flash_max_overlap]} " +
           "--outdir #{outd} " +
           "--basename #{basename} " +
-          "--bowtie-idx #{opts[:bowtie_idx].join(" ")}"
+          "--bowtie-idx #{opts[:bowtie_idx].join(" ")} " +
+          "--bowtie-seed #{opts[:bowtie_seed]}"
   else
     cmd = "ruby #{qc} " +
           "--forward #{for_f} " +
@@ -192,7 +196,9 @@ opts[:forward].each_with_index do |for_f, idx|
           "--adapters #{opts[:adapters]} " +
           "--flash-max-overlap #{opts[:flash_max_overlap]} " +
           "--outdir #{outd} " +
-          "--basename #{basename}"
+          "--basename #{basename} " +
+          "--bowtie-seed #{opts[:bowtie_seed]}"
+
   end
 
   Process.run_it! cmd

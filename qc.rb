@@ -116,8 +116,13 @@ opts = Optimist.options do
       "The bowtie2 index to screen reads against " +
       "(can provide more than one)",
       type: :strings)
+  opt(:bowtie_seed,
+      "The seed for bowtie",
+      default: 123123)
 
 end
+
+BOWTIE_SEED = opts[:bowtie_seed]
 
 TRIMMO = opts[:trimmomatic_jar]
 abort_unless_file_exists TRIMMO
