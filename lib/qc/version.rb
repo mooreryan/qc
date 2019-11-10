@@ -1,6 +1,6 @@
 module QC
   module Version
-    VERSION = "0.8.1"
+    VERSION = "0.8.2"
     VERSION_BANNER = "
     Version: #{QC::Version::VERSION}
     Copyright: 2015 - 2019 Ryan Moore

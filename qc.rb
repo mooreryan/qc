@@ -167,7 +167,7 @@ now = Time.now.strftime "%Y%m%d%H%M%S%L"
 big_log = File.join opts[:outdir], "qc_log.#{now}.txt"
 baseout = File.join opts[:outdir], BASENAME
 
-p opts
+$stderr.puts opts.inspect
 
 check_files opts[:forward]
 check_files opts[:reverse]

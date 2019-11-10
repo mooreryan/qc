@@ -1,7 +1,7 @@
 FROM mooreryan/build_essentials:0.1.0
 LABEL maintainer="moorer@udel.edu"
 
-ARG pipeline_version="0.8.1"
+ARG pipeline_version="0.8.2"
 ARG software=/home/software
 
 WORKDIR ${software}

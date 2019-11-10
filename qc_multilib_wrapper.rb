@@ -141,7 +141,9 @@ end
 check_files *opts[:forward]
 check_files *opts[:reverse]
 
-p opts
+gzip_option = opts[:gzip_output] ? "--gzip-output" : "--no-gzip-output"
+
+$stderr.puts opts.inspect
 
 abort_unless opts[:forward].count == opts[:reverse].count,
              "You need to provide equal numbers of forward " +
@@ -164,7 +166,7 @@ opts[:forward].each_with_index do |for_f, idx|
           "--forward #{for_f} " +
           "--reverse #{rev_f} " +
           "--threads #{opts[:threads]} " +
-          "--gzip-output #{opts[:gzip_output]} " +
+          "#{gzip_option} " +
           "--trimmomatic-headcrop #{opts[:trimmomatic_headcrop]} " +
           "--trimmomatic-seed-mismatches #{opts[:trimmomatic_seed_mismatches]} " +
           "--trimmomatic-palindrome-clip-threshold #{opts[:trimmomatic_palindrome_clip_threshold]} " +
@@ -184,7 +186,7 @@ opts[:forward].each_with_index do |for_f, idx|
           "--forward #{for_f} " +
           "--reverse #{rev_f} " +
           "--threads #{opts[:threads]} " +
-          "--gzip-output #{opts[:gzip_output]} " +
+          "#{gzip_option} " +
           "--trimmomatic-headcrop #{opts[:trimmomatic_headcrop]} " +
           "--trimmomatic-seed-mismatches #{opts[:trimmomatic_seed_mismatches]} " +
           "--trimmomatic-palindrome-clip-threshold #{opts[:trimmomatic_palindrome_clip_threshold]} " +
