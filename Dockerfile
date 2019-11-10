@@ -1,17 +1,13 @@
 FROM mooreryan/build_essentials:0.1.0
 LABEL maintainer="moorer@udel.edu"
 
-ARG pipeline_version="0.6.2"
+ARG pipeline_version="0.7.0"
 ARG software=/home/software
 
 WORKDIR ${software}
 
-# Update package manager.
-RUN apt-get update
-RUN apt-get upgrade -y
-
 # Install OpenJDK Java JRE.
-RUN apt-get install -y openjdk-8-jre
+RUN apt-get update && apt-get install -y openjdk-8-jre
 
 # Bowtie2
 

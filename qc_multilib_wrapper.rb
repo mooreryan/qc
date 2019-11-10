@@ -111,6 +111,19 @@ opts = Optimist.options do
   opt(:trimmomatic_min_len,
       "Min. length for trimmomatic",
       default: 50)
+  opt(:trimmomatic_jar,
+      "Path to trimmomatic jar",
+      default: File.join(File.dirname(__FILE__),
+                         "bin",
+                         "trimmomatic-0.35",
+                         "trimmomatic-0.35.jar"))
+  opt(:adapters,
+      "Path to adapter sequences to trim",
+      default: File.join(File.dirname(__FILE__),
+                         "bin",
+                         "trimmomatic-0.35",
+                         "adapters",
+                         "all.fa"))
 
   opt(:flash_max_overlap,
       "Max. overlap before penalty for FLASH",
@@ -156,6 +169,8 @@ opts[:forward].each_with_index do |for_f, idx|
           "--trimmomatic-window-size #{opts[:trimmomatic_window_size]} " +
           "--trimmomatic-window-quality #{opts[:trimmomatic_window_quality]} " +
           "--trimmomatic-min-len #{opts[:trimmomatic_min_len]} " +
+          "--trimmomatic-jar #{opts[:trimmomatic_jar]} " +
+          "--adapters #{opts[:adapters]} " +
           "--flash-max-overlap #{opts[:flash_max_overlap]} " +
           "--outdir #{outd} " +
           "--basename #{basename} " +
@@ -173,6 +188,8 @@ opts[:forward].each_with_index do |for_f, idx|
           "--trimmomatic-window-size #{opts[:trimmomatic_window_size]} " +
           "--trimmomatic-window-quality #{opts[:trimmomatic_window_quality]} " +
           "--trimmomatic-min-len #{opts[:trimmomatic_min_len]} " +
+          "--trimmomatic-jar #{opts[:trimmomatic_jar]} " +
+          "--adapters #{opts[:adapters]} " +
           "--flash-max-overlap #{opts[:flash_max_overlap]} " +
           "--outdir #{outd} " +
           "--basename #{basename}"

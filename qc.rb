@@ -94,6 +94,19 @@ opts = Optimist.options do
   opt(:trimmomatic_min_len,
       "Min. length for trimmomatic",
       default: 50)
+  opt(:trimmomatic_jar,
+      "Path to trimmomatic jar",
+      default: File.join(File.dirname(__FILE__),
+                         "bin",
+                         "trimmomatic-0.35",
+                         "trimmomatic-0.35.jar"))
+  opt(:adapters,
+      "Path to adapter sequences to trim",
+      default: File.join(File.dirname(__FILE__),
+                         "bin",
+                         "trimmomatic-0.35",
+                         "adapters",
+                         "all.fa"))
 
   opt(:flash_max_overlap,
       "Max. overlap before penalty for FLASH",
@@ -106,10 +119,11 @@ opts = Optimist.options do
 
 end
 
-TRIMMO = File.join File.dirname(__FILE__),
-                   "bin",
-                   "trimmomatic-0.35",
-                   "trimmomatic-0.35.jar"
+TRIMMO = opts[:trimmomatic_jar]
+abort_unless_file_exists TRIMMO
+
+TRIMSEQS = opts[:adapters]
+abort_unless_file_exists TRIMSEQS
 
 FLASH = `which flash`.chomp
 abort_if FLASH.empty?, "Missing flash"
@@ -140,12 +154,6 @@ THREADS = opts[:threads]
 MIN_LEN = opts[:trimmomatic_min_len]
 
 MAX_OVERLAP = opts[:flash_max_overlap]
-
-TRIMSEQS = File.join File.dirname(__FILE__),
-                     "bin",
-                     "trimmomatic-0.35",
-                     "adapters",
-                     "all.fa"
 
 java = `which java`.chomp
 abort_if java.empty?, "Missing java"
