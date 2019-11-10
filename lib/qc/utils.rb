@@ -146,7 +146,7 @@ module QC
 
     # Treat all reads as unpaired so that --un gives all reads that
     # did not align to the genome.
-    def screen!(index:, reads:, log:)
+    def screen!(index:, reads:, seed:, log:)
       # use bowtie2 to screen reads against against a genome
       good_reads = reads + ".did_not_align.fq"
       bad_reads  = reads + ".did_align.fq"
@@ -157,6 +157,7 @@ module QC
             "--threads #{THREADS} " +
             "--un #{good_reads} " +
             "--al #{bad_reads} " +
+            "--seed #{seed} " +
             "-S /dev/null " +
             ">> #{log} 2>&1"
 

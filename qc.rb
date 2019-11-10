@@ -291,16 +291,19 @@ if opts[:bowtie_idx]
     out_paired_1_good_reads, out_paired_1_bad_reads =
                              screen!(index: index_fname,
                                      reads: out_paired_1,
+                                     seed: BOWTIE_SEED,
                                      log: big_log)
 
     out_paired_2_good_reads, out_paired_2_bad_reads =
                              screen!(index: index_fname,
                                      reads: out_paired_2,
+                                     seed: BOWTIE_SEED + 1,
                                      log: big_log)
 
     out_unpaired_good_reads, out_unpaired_bad_reads =
                              screen!(index: index_fname,
                                      reads: out_unpaired,
+                                     seed: BOWTIE_SEED + 2,
                                      log: big_log)
 
     reads_that_hit_genome = File.join reads_that_hit_genome_dir,
