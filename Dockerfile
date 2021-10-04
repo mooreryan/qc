@@ -25,7 +25,8 @@ RUN rm bowtie2-2.3.5.1-linux-x86_64.zip
 ## Get the FixPairs source code.
 RUN wget https://raw.githubusercontent.com/mooreryan/FixPairs/47064a2ca5709070c15df9098db2d97bfe937109/fix_pairs.cc
 ## It's a C++ program, so compile it.
-RUN g++ -O2 -Wall --std=c++11 -o ${bin}/FixPairs fix_pairs.cc
+RUN g++ -O2 -Wall --std=c++11 -o ${software}/FixPairs fix_pairs.cc
+ENV PATH=${PATH}:${software}
 
 # FLASH
 
